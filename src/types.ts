@@ -168,6 +168,7 @@ export interface Lead {
   email: string;
   phone?: string;
   message?: string;
+  notes?: string | null;
   property_id?: string;
   source?: string;
   type?: string; // 'buy' | 'rent' | 'contact'
@@ -178,11 +179,11 @@ export interface Lead {
 
 export interface AdminStats {
   totalProperties: number;
-  availableProperties: number;
-  reservedProperties: number;
-  soldProperties: number;
+  availableProperties?: number;
+  reservedProperties?: number;
+  soldProperties?: number;
   totalLeads: number;
-  recentLeads: number;
+  recentLeads?: number;
   totalSales: number;
   monthlyRevenue: number;
   activeProperties: number;
