@@ -162,12 +162,14 @@ export interface AdminUser {
 export interface Lead {
   id: string;
   name: string;
+  client_name?: string; // Used in some forms
   email: string;
   phone?: string;
   message?: string;
   property_id?: string;
   source?: string;
-  status: 'new' | 'contacted' | 'qualified' | 'lost' | 'closed';
+  type?: string; // 'buy' | 'rent' | 'contact'
+  status: 'new' | 'contacted' | 'qualified' | 'lost' | 'closed' | 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'interested' | 'appointment' | 'negotiating' | 'discarded';
   created_at: string;
 }
 
@@ -178,4 +180,5 @@ export interface AdminStats {
   soldProperties: number;
   totalLeads: number;
   recentLeads: number;
+  totalSales: number; // Added to match usage
 }
