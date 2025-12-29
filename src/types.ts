@@ -24,6 +24,7 @@ export interface Property {
   updated_by: string | null;
   created_at: string;
   updated_at: string;
+  year_built?: number;
   // Extended properties
   location?: {
     city?: string;
@@ -58,6 +59,7 @@ export interface WebConfig {
   hero: {
     title: string;
     subtitle: string;
+    highlight?: string;
     bgImage: string;
     buttonText: string;
     buttonLink: string;
@@ -155,4 +157,25 @@ export interface AdminUser {
   name: string;
   email: string;
   role: 'SuperAdmin' | 'Agent';
+}
+
+export interface Lead {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  message?: string;
+  property_id?: string;
+  source?: string;
+  status: 'new' | 'contacted' | 'qualified' | 'lost' | 'closed';
+  created_at: string;
+}
+
+export interface AdminStats {
+  totalProperties: number;
+  availableProperties: number;
+  reservedProperties: number;
+  soldProperties: number;
+  totalLeads: number;
+  recentLeads: number;
 }
