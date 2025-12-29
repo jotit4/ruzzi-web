@@ -163,6 +163,8 @@ export interface Lead {
   id: string;
   name: string;
   client_name?: string; // Used in some forms
+  client_email?: string; // Explicit field used in constants/hooks
+  client_phone?: string; // Explicit field used in constants/hooks
   email: string;
   phone?: string;
   message?: string;
@@ -180,5 +182,6 @@ export interface AdminStats {
   soldProperties: number;
   totalLeads: number;
   recentLeads: number;
-  totalSales: number; // Added to match usage
+  totalSales: number;
+  monthlyRevenue: number;
 }
