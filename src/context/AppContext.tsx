@@ -376,7 +376,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const deleteUser = async (id: string) => {
     const { data: { session } } = await supabase.auth.getSession();
     const response = await supabase.functions.invoke('users-crud', {
-      body: { action: 'delete', data: { id } },
+      body: { action: 'delete', data: { userId: id } },
       headers: { Authorization: `Bearer ${session?.access_token}` }
     });
     if (response.error) throw new Error(response.error.message);
