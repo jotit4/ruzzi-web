@@ -345,12 +345,12 @@ export function useLeads() {
       // Mappings for remaining frontend statuses
       new: 'new',
       contacted: 'contacted',
-      qualified: 'qualified',
-      lost: 'lost',
+      qualified: 'interested', // 'qualified' not in DB, map to 'interested'
+      lost: 'discarded',       // 'lost' not in DB, map to 'discarded'
       closed: 'closed',
-      interested: 'contacted',
-      appointment: 'contacted',
-      negotiating: 'qualified',
+      interested: 'interested',
+      appointment: 'appointment',
+      negotiating: 'negotiating',
       discarded: 'discarded'
     };
 

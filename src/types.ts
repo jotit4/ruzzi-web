@@ -171,6 +171,7 @@ export interface Lead {
   property_id?: string;
   source?: string;
   type?: string; // 'buy' | 'rent' | 'contact'
+  booking_date?: string;
   status: 'new' | 'contacted' | 'qualified' | 'lost' | 'closed' | 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'interested' | 'appointment' | 'negotiating' | 'discarded';
   created_at: string;
 }
@@ -184,4 +185,7 @@ export interface AdminStats {
   recentLeads: number;
   totalSales: number;
   monthlyRevenue: number;
+  activeProperties: number;
+  totalViews: number;
+  conversionRate: number;
 }
