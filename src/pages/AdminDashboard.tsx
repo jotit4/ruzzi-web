@@ -560,7 +560,7 @@ const AdminDashboard = () => {
               Aplicar Filtros
             </button>
             <button
-              onClick={() => setFilters({ search: '', status: '', priceMin: null, priceMax: null })}
+              onClick={() => setFilters({ search: '', status: '', type: 'all', priceMin: null, priceMax: null })}
               className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
             >
               Limpiar
