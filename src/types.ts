@@ -175,6 +175,9 @@ export interface Lead {
   booking_date?: string;
   status: 'new' | 'contacted' | 'qualified' | 'lost' | 'closed' | 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'interested' | 'appointment' | 'negotiating' | 'discarded';
   created_at: string;
+  created_by?: string | null;
+  updated_by?: string | null;
+  assignedTo?: string;
 }
 
 export interface AdminStats {
