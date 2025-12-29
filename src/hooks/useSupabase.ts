@@ -341,7 +341,17 @@ export function useLeads() {
       pending: 'new',
       confirmed: 'contacted',
       completed: 'closed',
-      cancelled: 'discarded'
+      cancelled: 'discarded',
+      // Mappings for remaining frontend statuses
+      new: 'new',
+      contacted: 'contacted',
+      qualified: 'qualified',
+      lost: 'lost',
+      closed: 'closed',
+      interested: 'contacted',
+      appointment: 'contacted',
+      negotiating: 'qualified',
+      discarded: 'discarded'
     };
 
     const { error } = await supabase

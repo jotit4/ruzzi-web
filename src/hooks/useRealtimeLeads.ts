@@ -87,7 +87,7 @@ export function useRealtimeLeads() {
         { event: '*', schema: 'public', table: 'leads' },
         (payload) => {
           console.log('Leads change received!', payload);
-          
+
           if (payload.eventType === 'INSERT') {
             const newLead = payload.new as DbLead;
             const mappedLead = mapDbToLead(newLead);
@@ -142,7 +142,17 @@ export function useRealtimeLeads() {
       pending: 'new',
       confirmed: 'contacted',
       cancelled: 'discarded',
-      completed: 'closed'
+      completed: 'closed',
+      // Mappings for remaining frontend statuses to backend statuses
+      new: 'new',
+      contacted: 'contacted',
+      qualified: 'qualified',
+      lost: 'lost',
+      closed: 'closed',
+      interested: 'contacted',
+      appointment: 'contacted',
+      negotiating: 'qualified',
+      discarded: 'discarded'
     };
 
     const { error } = await supabase
@@ -153,13 +163,13 @@ export function useRealtimeLeads() {
     if (error) throw error;
   };
 
-  return { 
-    leads, 
-    loading, 
-    error, 
-    addLead, 
-    updateLeadStatus, 
+  return {
+    leads,
+    loading,
+    error,
+    addLead,
+    updateLeadStatus,
     refetch: fetchLeads,
-    isConnected: !!channel 
+    isConnected: !!channel
   };
 }
