@@ -295,8 +295,8 @@ const PropertyModal: React.FC<PropertyModalProps> = ({
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id as any)}
                     className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors flex items-center gap-2 ${activeTab === tab.id
-                        ? 'bg-gold text-white'
-                        : 'text-gray-600 hover:text-navy hover:bg-gray-50'
+                      ? 'bg-gold text-white'
+                      : 'text-gray-600 hover:text-navy hover:bg-gray-50'
                       }`}
                   >
                     <Icon size={16} />
@@ -310,7 +310,7 @@ const PropertyModal: React.FC<PropertyModalProps> = ({
 
         {/* Content */}
         <div className="flex-grow overflow-y-auto p-6">
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form id="property-form" onSubmit={handleSubmit} className="space-y-6">
 
             {/* Basic Information Tab */}
             {activeTab === 'basic' && (
@@ -376,273 +376,274 @@ const PropertyModal: React.FC<PropertyModalProps> = ({
                       onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
                       className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-gold outline-none"
                       disabled={isViewMode}
+                    >
                       <option value="USD">USD - Dólares</option>
-                    <option value="ARS">ARS - Pesos Argentinos</option>
-                    <option value="EUR">EUR - Euros</option>
-                  </select>
-                </div>
-
-                {/* Address */}
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-navy mb-2">
-                    Dirección *
-                  </label>
-                  <div className="relative">
-                    <MapPin size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                    <input
-                      type="text"
-                      required
-                      value={formData.address}
-                      onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                      className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-gold outline-none transition-colors ${errors.address ? 'border-red-300' : 'border-gray-200'
-                        }`}
-                      placeholder="Dirección completa"
-                      disabled={isViewMode}
-                    />
+                      <option value="ARS">ARS - Pesos Argentinos</option>
+                      <option value="EUR">EUR - Euros</option>
+                    </select>
                   </div>
-                  {errors.address && (
-                    <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
-                      <AlertCircle size={12} />
-                      {errors.address}
-                    </p>
-                  )}
-                </div>
 
-                {/* Property Type and Development */}
-                <div>
-                  <label className="block text-sm font-medium text-navy mb-2">
-                    Tipo de Propiedad
-                  </label>
-                  <select
-                    value={formData.property_type_id}
-                    onChange={(e) => setFormData({ ...formData, property_type_id: e.target.value })}
-                    className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-gold outline-none"
-                    disabled={isViewMode}
-                  >
-                    <option value="">Seleccionar tipo...</option>
-                    {propertyTypes.map(pt => (
-                      <option key={pt.id} value={pt.id}>{pt.display_name}</option>
-                    ))}
-                  </select>
-                </div>
+                  {/* Address */}
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-navy mb-2">
+                      Dirección *
+                    </label>
+                    <div className="relative">
+                      <MapPin size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <input
+                        type="text"
+                        required
+                        value={formData.address}
+                        onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                        className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-gold outline-none transition-colors ${errors.address ? 'border-red-300' : 'border-gray-200'
+                          }`}
+                        placeholder="Dirección completa"
+                        disabled={isViewMode}
+                      />
+                    </div>
+                    {errors.address && (
+                      <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+                        <AlertCircle size={12} />
+                        {errors.address}
+                      </p>
+                    )}
+                  </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-navy mb-2">
-                    Desarrollo Inmobiliario
-                  </label>
-                  <select
-                    value={formData.development_id}
-                    onChange={(e) => setFormData({ ...formData, development_id: e.target.value })}
-                    className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-gold outline-none"
-                    disabled={isViewMode}
-                  >
-                    <option value="">Ninguno</option>
-                    {developments.map(d => (
-                      <option key={d.id} value={d.id}>{d.name}</option>
-                    ))}
-                  </select>
-                </div>
+                  {/* Property Type and Development */}
+                  <div>
+                    <label className="block text-sm font-medium text-navy mb-2">
+                      Tipo de Propiedad
+                    </label>
+                    <select
+                      value={formData.property_type_id}
+                      onChange={(e) => setFormData({ ...formData, property_type_id: e.target.value })}
+                      className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-gold outline-none"
+                      disabled={isViewMode}
+                    >
+                      <option value="">Seleccionar tipo...</option>
+                      {propertyTypes.map(pt => (
+                        <option key={pt.id} value={pt.id}>{pt.display_name}</option>
+                      ))}
+                    </select>
+                  </div>
 
-                {/* Property Details */}
-                <div>
-                  <label className="block text-sm font-medium text-navy mb-2">
-                    Área Total (m²) *
-                  </label>
-                  <div className="relative">
-                    <Square size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <div>
+                    <label className="block text-sm font-medium text-navy mb-2">
+                      Desarrollo Inmobiliario
+                    </label>
+                    <select
+                      value={formData.development_id}
+                      onChange={(e) => setFormData({ ...formData, development_id: e.target.value })}
+                      className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-gold outline-none"
+                      disabled={isViewMode}
+                    >
+                      <option value="">Ninguno</option>
+                      {developments.map(d => (
+                        <option key={d.id} value={d.id}>{d.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Property Details */}
+                  <div>
+                    <label className="block text-sm font-medium text-navy mb-2">
+                      Área Total (m²) *
+                    </label>
+                    <div className="relative">
+                      <Square size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <input
+                        type="number"
+                        required
+                        min="0"
+                        step="0.01"
+                        value={formData.area_total}
+                        onChange={(e) => setFormData({ ...formData, area_total: parseFloat(e.target.value) || 0 })}
+                        className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-gold outline-none transition-colors ${errors.area_total ? 'border-red-300' : 'border-gray-200'
+                          }`}
+                        placeholder="0.00"
+                        disabled={isViewMode}
+                      />
+                    </div>
+                    {errors.area_total && (
+                      <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+                        <AlertCircle size={12} />
+                        {errors.area_total}
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-navy mb-2">
+                      Habitaciones
+                    </label>
+                    <div className="relative">
+                      <Bed size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <input
+                        type="number"
+                        min="0"
+                        value={formData.bedrooms}
+                        onChange={(e) => setFormData({ ...formData, bedrooms: parseInt(e.target.value) || 0 })}
+                        className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-gold outline-none transition-colors ${errors.bedrooms ? 'border-red-300' : 'border-gray-200'
+                          }`}
+                        placeholder="0"
+                        disabled={isViewMode}
+                      />
+                    </div>
+                    {errors.bedrooms && (
+                      <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+                        <AlertCircle size={12} />
+                        {errors.bedrooms}
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-navy mb-2">
+                      Baños
+                    </label>
+                    <div className="relative">
+                      <Bath size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <input
+                        type="number"
+                        min="0"
+                        value={formData.bathrooms}
+                        onChange={(e) => setFormData({ ...formData, bathrooms: parseInt(e.target.value) || 0 })}
+                        className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-gold outline-none transition-colors ${errors.bathrooms ? 'border-red-300' : 'border-gray-200'
+                          }`}
+                        placeholder="0"
+                        disabled={isViewMode}
+                      />
+                    </div>
+                    {errors.bathrooms && (
+                      <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+                        <AlertCircle size={12} />
+                        {errors.bathrooms}
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-navy mb-2">
+                      Cocheras
+                    </label>
                     <input
                       type="number"
-                      required
                       min="0"
-                      step="0.01"
-                      value={formData.area_total}
-                      onChange={(e) => setFormData({ ...formData, area_total: parseFloat(e.target.value) || 0 })}
-                      className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-gold outline-none transition-colors ${errors.area_total ? 'border-red-300' : 'border-gray-200'
-                        }`}
-                      placeholder="0.00"
-                      disabled={isViewMode}
-                    />
-                  </div>
-                  {errors.area_total && (
-                    <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
-                      <AlertCircle size={12} />
-                      {errors.area_total}
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-navy mb-2">
-                    Habitaciones
-                  </label>
-                  <div className="relative">
-                    <Bed size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                    <input
-                      type="number"
-                      min="0"
-                      value={formData.bedrooms}
-                      onChange={(e) => setFormData({ ...formData, bedrooms: parseInt(e.target.value) || 0 })}
-                      className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-gold outline-none transition-colors ${errors.bedrooms ? 'border-red-300' : 'border-gray-200'
-                        }`}
+                      value={formData.parking_spaces}
+                      onChange={(e) => setFormData({ ...formData, parking_spaces: parseInt(e.target.value) || 0 })}
+                      className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-gold outline-none"
                       placeholder="0"
                       disabled={isViewMode}
                     />
                   </div>
-                  {errors.bedrooms && (
-                    <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
-                      <AlertCircle size={12} />
-                      {errors.bedrooms}
-                    </p>
-                  )}
-                </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-navy mb-2">
-                    Baños
-                  </label>
-                  <div className="relative">
-                    <Bath size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  {/* Status and Featured */}
+                  <div>
+                    <label className="block text-sm font-medium text-navy mb-2">
+                      Estado de la Propiedad
+                    </label>
+                    <select
+                      value={formData.status}
+                      onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                      className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-gold outline-none"
+                      disabled={isViewMode}
+                    >
+                      {statusOptions.map(option => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-navy mb-2">
+                      Año de Construcción
+                    </label>
                     <input
                       type="number"
-                      min="0"
-                      value={formData.bathrooms}
-                      onChange={(e) => setFormData({ ...formData, bathrooms: parseInt(e.target.value) || 0 })}
-                      className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-gold outline-none transition-colors ${errors.bathrooms ? 'border-red-300' : 'border-gray-200'
+                      min="1900"
+                      max={new Date().getFullYear() + 10}
+                      value={formData.year_built}
+                      onChange={(e) => setFormData({ ...formData, year_built: parseInt(e.target.value) || new Date().getFullYear() })}
+                      className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-gold outline-none transition-colors ${errors.year_built ? 'border-red-300' : 'border-gray-200'
                         }`}
-                      placeholder="0"
+                      placeholder={new Date().getFullYear().toString()}
                       disabled={isViewMode}
                     />
+                    {errors.year_built && (
+                      <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+                        <AlertCircle size={12} />
+                        {errors.year_built}
+                      </p>
+                    )}
                   </div>
-                  {errors.bathrooms && (
-                    <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
-                      <AlertCircle size={12} />
-                      {errors.bathrooms}
-                    </p>
-                  )}
                 </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-navy mb-2">
-                    Cocheras
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={formData.parking_spaces}
-                    onChange={(e) => setFormData({ ...formData, parking_spaces: parseInt(e.target.value) || 0 })}
-                    className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-gold outline-none"
-                    placeholder="0"
-                    disabled={isViewMode}
-                  />
-                </div>
-
-                {/* Status and Featured */}
-                <div>
-                  <label className="block text-sm font-medium text-navy mb-2">
-                    Estado de la Propiedad
-                  </label>
-                  <select
-                    value={formData.status}
-                    onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                    className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-gold outline-none"
-                    disabled={isViewMode}
-                  >
-                    {statusOptions.map(option => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-navy mb-2">
-                    Año de Construcción
-                  </label>
-                  <input
-                    type="number"
-                    min="1900"
-                    max={new Date().getFullYear() + 10}
-                    value={formData.year_built}
-                    onChange={(e) => setFormData({ ...formData, year_built: parseInt(e.target.value) || new Date().getFullYear() })}
-                    className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-gold outline-none transition-colors ${errors.year_built ? 'border-red-300' : 'border-gray-200'
-                      }`}
-                    placeholder={new Date().getFullYear().toString()}
-                    disabled={isViewMode}
-                  />
-                  {errors.year_built && (
-                    <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
-                      <AlertCircle size={12} />
-                      {errors.year_built}
-                    </p>
-                  )}
-                </div>
-              </div>
 
                 {/* Description */}
-            <div>
-              <label className="block text-sm font-medium text-navy mb-2">
-                Descripción
-              </label>
-              <div className="relative">
-                <FileText size={16} className="absolute left-3 top-3 text-gray-400" />
-                <textarea
-                  rows={4}
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-gold outline-none resize-none"
-                  placeholder="Descripción detallada de la propiedad, características especiales, amenities, etc."
-                  disabled={isViewMode}
-                />
+                <div>
+                  <label className="block text-sm font-medium text-navy mb-2">
+                    Descripción
+                  </label>
+                  <div className="relative">
+                    <FileText size={16} className="absolute left-3 top-3 text-gray-400" />
+                    <textarea
+                      rows={4}
+                      value={formData.description}
+                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                      className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-gold outline-none resize-none"
+                      placeholder="Descripción detallada de la propiedad, características especiales, amenities, etc."
+                      disabled={isViewMode}
+                    />
+                  </div>
+                </div>
               </div>
-            </div>
+            )}
+
+            {/* Continue with other tabs... */}
+
+          </form>
         </div>
-            )}
 
-        {/* Continue with other tabs... */}
+        {/* Footer */}
+        <div className="p-6 border-t border-gray-100 bg-gray-50">
+          <div className="flex justify-between items-center">
+            <div className="text-sm text-gray-500">
+              {mode === 'create' ? 'Complete todos los campos obligatorios' :
+                mode === 'edit' ? 'Los cambios se guardarán inmediatamente' :
+                  'Vista de solo lectura'}
+            </div>
 
-      </form>
-    </div>
+            <div className="flex gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onClose}
+                disabled={uploading}
+              >
+                {isViewMode ? 'Cerrar' : 'Cancelar'}
+              </Button>
 
-        {/* Footer */ }
-  <div className="p-6 border-t border-gray-100 bg-gray-50">
-    <div className="flex justify-between items-center">
-      <div className="text-sm text-gray-500">
-        {mode === 'create' ? 'Complete todos los campos obligatorios' :
-          mode === 'edit' ? 'Los cambios se guardarán inmediatamente' :
-            'Vista de solo lectura'}
-      </div>
-
-      <div className="flex gap-3">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={onClose}
-          disabled={uploading}
-        >
-          {isViewMode ? 'Cerrar' : 'Cancelar'}
-        </Button>
-
-        {!isViewMode && (
-          <Button
-            type="submit"
-            form="property-form"
-            disabled={uploading}
-            className="min-w-[120px]"
-          >
-            {uploading ? (
-              <RefreshCw size={16} className="animate-spin mr-2" />
-            ) : (
-              <Save size={16} className="mr-2" />
-            )}
-            {uploading ? 'Guardando...' :
-              mode === 'create' ? 'Crear Propiedad' :
-                'Actualizar'}
-          </Button>
-        )}
-      </div>
-    </div>
-  </div>
+              {!isViewMode && (
+                <Button
+                  type="submit"
+                  form="property-form"
+                  disabled={uploading}
+                  className="min-w-[120px]"
+                >
+                  {uploading ? (
+                    <RefreshCw size={16} className="animate-spin mr-2" />
+                  ) : (
+                    <Save size={16} className="mr-2" />
+                  )}
+                  {uploading ? 'Guardando...' :
+                    mode === 'create' ? 'Crear Propiedad' :
+                      'Actualizar'}
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
       </div >
     </div >
   );
