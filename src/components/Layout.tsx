@@ -56,7 +56,7 @@ const Header = () => {
         <div className="flex items-center justify-between h-20">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-3 group">
-            <Logo className="h-10 w-auto text-navy" />
+            <Logo className="h-14 w-auto text-navy" />
           </Link>
 
           {/* Search Bar - Desktop */}
@@ -182,7 +182,7 @@ const Footer = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-16">
           <div className="space-y-6">
             <div className="mb-6">
-              <Logo className="h-10 w-auto text-white filter brightness-0 invert" />
+              <Logo className="h-14 w-auto" />
             </div>
             <p className="text-white text-sm leading-relaxed font-light">
               Transformamos visiones en realidades habitables. Líderes en desarrollo inmobiliario premium y urbanización inteligente en Córdoba.
