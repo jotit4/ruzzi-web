@@ -22,6 +22,7 @@ function mapDbToLead(dbLead: DbLead): Lead {
     client_phone: dbLead.phone || '',
     property_id: dbLead.property_type_preference || 'general',
     booking_date: dbLead.created_at,
+    created_at: dbLead.created_at,
     status: statusMap[dbLead.status] || 'pending',
     notes: dbLead.notes || null,
     created_by: dbLead.assigned_to || null,
@@ -32,7 +33,7 @@ function mapDbToLead(dbLead: DbLead): Lead {
     phone: dbLead.phone || '',
     type: dbLead.property_type_preference || 'Consulta General',
     message: dbLead.notes || '',
-    date: dbLead.created_at.split('T')[0],
+
     assignedTo: dbLead.assigned_to || undefined
   };
 }
