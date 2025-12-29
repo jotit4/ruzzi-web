@@ -58,10 +58,18 @@ const AdminDashboard = () => {
   const [previewProperty, setPreviewProperty] = useState<Partial<Property>>({});
 
   const [showFilters, setShowFilters] = useState(false);
-  const [filters, setFilters] = useState({
+  const [filters, setFilters] = useState<{
+    search: string;
+    status: string;
+    type: string;
+    priceMin?: number | null;
+    priceMax?: number | null;
+  }>({
     search: '',
     status: 'all',
-    type: 'all'
+    type: 'all',
+    priceMin: null,
+    priceMax: null
   });
   const [localWebConfig, setLocalWebConfig] = useState<WebConfig | null>(null);
   const [imagesLoading, setImagesLoading] = useState(false);
