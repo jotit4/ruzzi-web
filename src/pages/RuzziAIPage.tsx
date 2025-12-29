@@ -15,7 +15,7 @@ const RuzziAIPage = () => {
   const generateAIResponse = (userMessage: string, properties: Property[]) => {
     const safeProperties = Array.isArray(properties) ? properties : [];
     const msg = userMessage.toLowerCase();
-    
+
     // Análisis inteligente basado en el mensaje del usuario
     if (msg.includes('casa') || msg.includes('vivienda') || msg.includes('vivir')) {
       const availableHouses = safeProperties.filter(p => p.type === 'house' && p.status === 'available');
@@ -24,7 +24,7 @@ const RuzziAIPage = () => {
       }
       return "Te ayudo a encontrar la casa perfecta para tu familia. ¿Tienes algún presupuesto específico o zona preferida en Docta?";
     }
-    
+
     if (msg.includes('invertir') || msg.includes('inversión') || msg.includes('renta')) {
       const investmentProperties = safeProperties.filter(p => p.status === 'available');
       if (investmentProperties.length > 0) {
@@ -32,7 +32,7 @@ const RuzziAIPage = () => {
       }
       return "Como asesor de inversiones, analizo el ROI de cada propiedad. ¿Prefieres lotes, departamentos o casas para tu portafolio?";
     }
-    
+
     if (msg.includes('departamento') || msg.includes('apto')) {
       const apartments = safeProperties.filter(p => p.type === 'apartment' && p.status === 'available');
       if (apartments.length > 0) {
@@ -40,7 +40,7 @@ const RuzziAIPage = () => {
       }
       return "Los departamentos en Docta tienen alta demanda por su ubicación estratégica. ¿Tienes preferencias de cantidad de dormitorios?";
     }
-    
+
     if (msg.includes('precio') || msg.includes('presupuesto') || msg.includes('costo')) {
       if (safeProperties.length > 0) {
         const minPrice = Math.min(...safeProperties.map(p => p.price));
@@ -49,16 +49,16 @@ const RuzziAIPage = () => {
       }
       return "Tengo opciones en diferentes rangos de precio. ¿Buscas algo hasta $500k, $1M, o más?";
     }
-    
+
     if (msg.includes('ubicación') || msg.includes('zona') || msg.includes('donde')) {
       const locations = [...new Set(safeProperties.map(p => p.location))];
       return `Trabajamos en ubicaciones premium como ${locations.slice(0, 3).join(', ')}. ¿Tienes alguna zona específica en mente?`;
     }
-    
+
     if (msg.includes('visita') || msg.includes('conocer') || msg.includes('ver')) {
       return "Perfecto, puedo agendar una visita personalizada. ¿Tienes disponibilidad esta semana? También puedo enviarte un dossier detallado de las propiedades de tu interés.";
     }
-    
+
     // Respuesta genérica inteligente
     return "Entiendo tu consulta. Como especialista en Docta Urbanización, tengo acceso a nuestro catálogo completo. ¿Buscas algo específico o prefieres que te muestre nuestras mejores opciones actuales?";
   };
@@ -94,6 +94,8 @@ const RuzziAIPage = () => {
     const lastMessage = messages[messages.length - 1];
     if (lastMessage?.role === 'user') {
       await createLead({
+        name: 'Usuario RUZZI AI',
+        email: 'usuario@ruzzi-ai.com',
         client_name: 'Usuario RUZZI AI',
         client_email: 'usuario@ruzzi-ai.com',
         client_phone: '+54 351 000-0000',
@@ -115,16 +117,16 @@ const RuzziAIPage = () => {
           <div className="absolute top-0 left-1/4 w-64 h-64 bg-gold rounded-full blur-3xl"></div>
         </div>
         <div className="container mx-auto px-4 relative z-10">
-           <div className="inline-flex items-center gap-2 bg-gold/20 text-gold px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest mb-4">
-             <Sparkles size={14} /> Nueva Tecnología
-           </div>
-           <h1 className="text-4xl md:text-5xl font-serif font-bold mb-4">RUZZI AI</h1>
-           <p className="text-gray-400 max-w-xl mx-auto">Tu asesor digital 24/7 para decisiones inteligentes en Real Estate.</p>
+          <div className="inline-flex items-center gap-2 bg-gold/20 text-gold px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest mb-4">
+            <Sparkles size={14} /> Nueva Tecnología
+          </div>
+          <h1 className="text-4xl md:text-5xl font-serif font-bold mb-4">RUZZI AI</h1>
+          <p className="text-gray-400 max-w-xl mx-auto">Tu asesor digital 24/7 para decisiones inteligentes en Real Estate.</p>
         </div>
       </div>
 
       <div className="flex-grow container mx-auto px-4 py-10 max-w-5xl flex flex-col lg:flex-row gap-10">
-        
+
         {/* Chat Area */}
         <div className="flex-grow bg-white rounded-2xl shadow-premium border border-gray-100 flex flex-col h-[600px] overflow-hidden">
           <div className="p-4 border-b border-gray-50 bg-gray-50/50 flex items-center justify-between">
@@ -143,9 +145,9 @@ const RuzziAIPage = () => {
             {messages.map((msg, idx) => (
               <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                 <div className={`max-w-[80%] p-4 rounded-2xl flex gap-3 ${msg.role === 'user' ? 'bg-navy text-white rounded-tr-none' : 'bg-gray-50 text-navy rounded-tl-none border border-gray-100'}`}>
-                   {msg.role === 'assistant' && <Bot className="shrink-0 text-gold" size={20} />}
-                   <p className="text-sm leading-relaxed">{msg.content}</p>
-                   {msg.role === 'user' && <User className="shrink-0 text-gold/50" size={20} />}
+                  {msg.role === 'assistant' && <Bot className="shrink-0 text-gold" size={20} />}
+                  <p className="text-sm leading-relaxed">{msg.content}</p>
+                  {msg.role === 'user' && <User className="shrink-0 text-gold/50" size={20} />}
                 </div>
               </div>
             ))}
@@ -165,14 +167,14 @@ const RuzziAIPage = () => {
 
           <form onSubmit={handleSend} className="p-4 border-t border-gray-100 bg-white">
             <div className="relative">
-              <input 
-                type="text" 
+              <input
+                type="text"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 placeholder="Escribe tu consulta aquí..."
                 className="w-full pl-6 pr-14 py-4 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-1 focus:ring-gold transition-all"
               />
-              <button 
+              <button
                 type="submit"
                 className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-gold text-white rounded-lg flex items-center justify-center hover:bg-gold-dark transition-colors"
               >
@@ -184,81 +186,81 @@ const RuzziAIPage = () => {
 
         {/* Info Sidebar */}
         <div className="lg:w-80 space-y-6">
-           <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-             <h3 className="font-serif font-bold text-navy mb-4 flex items-center gap-2">
-               <TrendingUp size={20} className="text-gold" /> Capacidades AI
-             </h3>
-             <ul className="space-y-4 text-xs font-medium text-gray-500">
-               <li className="flex gap-2">
-                 <CheckCircle className="text-green-500 shrink-0" size={14} /> Clasificación de Perfil de Inversión
-               </li>
-               <li className="flex gap-2">
-                 <CheckCircle className="text-green-500 shrink-0" size={14} /> Recomendaciones de Stock Real
-               </li>
-               <li className="flex gap-2">
-                 <CheckCircle className="text-green-500 shrink-0" size={14} /> Proyección de ROI estimada
-               </li>
-             </ul>
-           </div>
+          <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+            <h3 className="font-serif font-bold text-navy mb-4 flex items-center gap-2">
+              <TrendingUp size={20} className="text-gold" /> Capacidades AI
+            </h3>
+            <ul className="space-y-4 text-xs font-medium text-gray-500">
+              <li className="flex gap-2">
+                <CheckCircle className="text-green-500 shrink-0" size={14} /> Clasificación de Perfil de Inversión
+              </li>
+              <li className="flex gap-2">
+                <CheckCircle className="text-green-500 shrink-0" size={14} /> Recomendaciones de Stock Real
+              </li>
+              <li className="flex gap-2">
+                <CheckCircle className="text-green-500 shrink-0" size={14} /> Proyección de ROI estimada
+              </li>
+            </ul>
+          </div>
 
-           {/* Quick Actions */}
-           <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-             <h3 className="font-serif font-bold text-navy mb-4 flex items-center gap-2">
-               <Building2 size={20} className="text-gold" /> Consultas Rápidas
-             </h3>
-             <div className="space-y-2">
-               <button 
-                 onClick={() => handleQuickAction('Busco una casa para vivir con mi familia')}
-                 className="w-full text-left p-3 text-xs bg-gray-50 hover:bg-gold/10 rounded-lg transition-colors border border-gray-100 hover:border-gold/30"
-               >
-                 🏠 Casas para vivir
-               </button>
-               <button 
-                 onClick={() => handleQuickAction('Quiero invertir en propiedades')}
-                 className="w-full text-left p-3 text-xs bg-gray-50 hover:bg-gold/10 rounded-lg transition-colors border border-gray-100 hover:border-gold/30"
-               >
-                 📈 Oportunidades de inversión
-               </button>
-               <button 
-                 onClick={() => handleQuickAction('Necesito departamentos')}
-                 className="w-full text-left p-3 text-xs bg-gray-50 hover:bg-gold/10 rounded-lg transition-colors border border-gray-100 hover:border-gold/30"
-               >
-                 🏢 Departamentos disponibles
-               </button>
-               <button 
-                 onClick={() => handleQuickAction('¿Cuál es el rango de precios?')}
-                 className="w-full text-left p-3 text-xs bg-gray-50 hover:bg-gold/10 rounded-lg transition-colors border border-gray-100 hover:border-gold/30"
-               >
-                 💰 Consulta de precios
-               </button>
-             </div>
-           </div>
+          {/* Quick Actions */}
+          <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+            <h3 className="font-serif font-bold text-navy mb-4 flex items-center gap-2">
+              <Building2 size={20} className="text-gold" /> Consultas Rápidas
+            </h3>
+            <div className="space-y-2">
+              <button
+                onClick={() => handleQuickAction('Busco una casa para vivir con mi familia')}
+                className="w-full text-left p-3 text-xs bg-gray-50 hover:bg-gold/10 rounded-lg transition-colors border border-gray-100 hover:border-gold/30"
+              >
+                🏠 Casas para vivir
+              </button>
+              <button
+                onClick={() => handleQuickAction('Quiero invertir en propiedades')}
+                className="w-full text-left p-3 text-xs bg-gray-50 hover:bg-gold/10 rounded-lg transition-colors border border-gray-100 hover:border-gold/30"
+              >
+                📈 Oportunidades de inversión
+              </button>
+              <button
+                onClick={() => handleQuickAction('Necesito departamentos')}
+                className="w-full text-left p-3 text-xs bg-gray-50 hover:bg-gold/10 rounded-lg transition-colors border border-gray-100 hover:border-gold/30"
+              >
+                🏢 Departamentos disponibles
+              </button>
+              <button
+                onClick={() => handleQuickAction('¿Cuál es el rango de precios?')}
+                className="w-full text-left p-3 text-xs bg-gray-50 hover:bg-gold/10 rounded-lg transition-colors border border-gray-100 hover:border-gold/30"
+              >
+                💰 Consulta de precios
+              </button>
+            </div>
+          </div>
 
-           <div className="bg-navy text-white p-6 rounded-2xl shadow-lg relative overflow-hidden group">
-             <div className="absolute top-0 right-0 p-4 opacity-20 transform group-hover:scale-125 transition-transform">
-               <ShieldCheck size={40} />
-             </div>
-             <h4 className="font-serif font-bold text-lg mb-2">Seguridad Ruzzi</h4>
-             <p className="text-xs text-gray-400 leading-relaxed">Toda tu información está protegida bajo estándares de privacidad corporativos.</p>
-           </div>
-           
-           <Button 
-             variant="outline" 
-             fullWidth 
-             className="border-gray-300"
-             onClick={handleCreateLeadFromChat}
-           >
-             📞 Contactar Humano
-           </Button>
-           
-           <Button 
-             variant="primary" 
-             fullWidth 
-             className="bg-gold hover:bg-gold-dark"
-             onClick={() => handleQuickAction('Quiero programar una visita')}
-           >
-             🏠 Agendar Visita
-           </Button>
+          <div className="bg-navy text-white p-6 rounded-2xl shadow-lg relative overflow-hidden group">
+            <div className="absolute top-0 right-0 p-4 opacity-20 transform group-hover:scale-125 transition-transform">
+              <ShieldCheck size={40} />
+            </div>
+            <h4 className="font-serif font-bold text-lg mb-2">Seguridad Ruzzi</h4>
+            <p className="text-xs text-gray-400 leading-relaxed">Toda tu información está protegida bajo estándares de privacidad corporativos.</p>
+          </div>
+
+          <Button
+            variant="outline"
+            fullWidth
+            className="border-gray-300"
+            onClick={handleCreateLeadFromChat}
+          >
+            📞 Contactar Humano
+          </Button>
+
+          <Button
+            variant="primary"
+            fullWidth
+            className="bg-gold hover:bg-gold-dark"
+            onClick={() => handleQuickAction('Quiero programar una visita')}
+          >
+            🏠 Agendar Visita
+          </Button>
         </div>
       </div>
     </div>
