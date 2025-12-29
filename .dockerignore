@@ -1,0 +1,11 @@
+node_modules
+dist
+.git
+.env
+.env.*
+.DS_Store
+coverage
+drive-download-20251228T043919Z-1-001
+test.jfif
+videos_to_upload.*
+analysis_report.json
