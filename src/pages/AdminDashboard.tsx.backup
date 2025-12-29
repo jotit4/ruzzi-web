@@ -1,0 +1,787 @@
+import React, { useState, useEffect } from 'react';
+import { 
+  Users, Building, BarChart3, Plus, Search, 
+  LogOut, CheckCircle, MessageSquare, Edit2, Trash2, 
+  ArrowUpRight, X, Save, Upload, MapPin, DollarSign,
+  Shield, UserCog, Calendar, Phone, Mail, Eye, Settings
+} from 'lucide-react';
+import Logo from '../components/Logo';
+import { useNavigate } from 'react-router-dom';
+import { useApp } from '../context/AppContext';
+import { Property, Lead } from '../types';
+import Button from '../components/Button';
+import { supabase } from '../lib/supabase';
+import { usePropertyTypes, useDevelopments, useLeadSources } from '../hooks/useSupabase';
+import { useImageUpload } from '../hooks/useImageUpload';
+import { useRolePermissions } from '../hooks/useUserProfile';
+import RealtimeStatus from '../components/RealtimeStatus';
+
+type TabType = 'overview' | 'properties' | 'leads' | 'users' | 'settings';
+
+interface PropertyFormData {
+  title: string;
+  description: string;
+  price: number;
+  currency: string;
+  address: string;
+  area_total: number;
+  bedrooms: number;
+  bathrooms: number;
+  property_type_id: string;
+  development_id: string;
+  status: string;
+  is_featured: boolean;
+}
+
+const AdminDashboard = () => {
+  const [activeTab, setActiveTab] = useState<TabType>('overview');
+  const [showPropertyModal, setShowPropertyModal] = useState(false);
+  const [editingProperty, setEditingProperty] = useState<Property | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{ [key: string]: number }>({});
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  
+  const { properties, leads, stats, updateLeadStatus, deleteProperty, addProperty, updateProperty, logout, loading, realtimeConnected } = useApp();
+  const { propertyTypes } = usePropertyTypes();
+  const { developments } = useDevelopments();
+  const { leadSources } = useLeadSources();
+  const { uploadMultipleImages, uploading: uploadLoading, error: uploadError } = useImageUpload();
+  const { hasPermission, isSuperAdmin, isAdmin, getUserRole } = useRolePermissions();
+  const navigate = useNavigate();
+
+  // Removed console logs to reduce re-renders
+
+  const [formData, setFormData] = useState<PropertyFormData>({
+    title: '',
+    description: '',
+    price: 0,
+    currency: 'USD',
+    address: '',
+    area_total: 0,
+    bedrooms: 0,
+    bathrooms: 0,
+    property_type_id: '',
+    development_id: '',
+    status: 'available',
+    is_featured: false
+  });
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login');
+  };
+
+  const handleDeleteProperty = async (id: string) => {
+    if (window.confirm('Esta seguro de eliminar esta propiedad? Esta accion no se puede deshacer.')) {
+      await deleteProperty(id);
+    }
+  };
+
+  const handleStatusChange = async (leadId: string, newStatus: Lead['status']) => {
+    await updateLeadStatus(leadId, newStatus);
+  };
+
+  const handlePropertySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setUploading(true);
+
+    try {
+      // Insert property
+      const { data: newProp, error } = await supabase
+        .from('properties')
+        .insert({
+          title: formData.title,
+          description: formData.description,
+          price: formData.price,
+          currency: formData.currency,
+          address: formData.address,
+          area_total: formData.area_total,
+          bedrooms: formData.bedrooms,
+          bathrooms: formData.bathrooms,
+          property_type_id: formData.property_type_id || null,
+          development_id: formData.development_id || null,
+          status: formData.status,
+          is_featured: formData.is_featured,
+          is_published: true
+        })
+        .select()
+        .maybeSingle();
+
+      if (error) throw error;
+
+      // Upload images if any using the new hook
+      if (newProp && selectedFiles.length > 0) {
+        setUploadProgress({});
+        const uploadPromises = selectedFiles.map((file, index) => {
+          const key = `file_${index}`;
+          setUploadProgress(prev => ({ ...prev, [key]: 0 }));
+          
+          return uploadMultipleImages([file], newProp.id)
+            .then(results => {
+              setUploadProgress(prev => ({ ...prev, [key]: 100 }));
+              return results[0];
+            });
+        });
+        
+        await Promise.all(uploadPromises);
+      }
+
+      setShowPropertyModal(false);
+      resetForm();
+      window.location.reload();
+    } catch (err) {
+      console.error('Error creating property:', err);
+      alert('Error al crear la propiedad: ' + (err instanceof Error ? err.message : 'Error desconocido'));
+    } finally {
+      setUploading(false);
+      setUploadProgress({});
+    }
+  };
+
+  const resetForm = () => {
+    setFormData({
+      title: '',
+      description: '',
+      price: 0,
+      currency: 'USD',
+      address: '',
+      area_total: 0,
+      bedrooms: 0,
+      bathrooms: 0,
+      property_type_id: '',
+      development_id: '',
+      status: 'available',
+      is_featured: false
+    });
+    setSelectedFiles([]);
+    setEditingProperty(null);
+    setUploadProgress({});
+  };
+
+  const handleFileSelect = (files: FileList | null) => {
+    if (!files) return;
+    const newFiles = Array.from(files);
+    
+    // Validate files
+    const validFiles = newFiles.filter(file => {
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+      if (!allowedTypes.includes(file.type)) {
+        alert(`Archivo ${file.name} no es un tipo válido. Solo JPEG, PNG, WebP y GIF están permitidos.`);
+        return false;
+      }
+      if (file.size > 10 * 1024 * 1024) {
+        alert(`Archivo ${file.name} es demasiado grande. Máximo 10MB permitido.`);
+        return false;
+      }
+      return true;
+    });
+    
+    setSelectedFiles(prev => [...prev, ...validFiles]);
+  };
+
+  const removeFile = (index: number) => {
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
+    setUploadProgress(prev => {
+      const newProgress = { ...prev };
+      Object.keys(newProgress).forEach(key => {
+        if (key.startsWith(`file_${index}`)) {
+          delete newProgress[key];
+        }
+      });
+      return newProgress;
+    });
+  };
+
+  const filteredProperties = properties.filter(p => {
+    const matchesSearch = p.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         p.location.toLowerCase().includes(searchTerm.toLowerCase());
+    return matchesSearch;
+  });
+
+  const filteredLeads = leads.filter(l => {
+    const matchesSearch = l.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         l.email.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = statusFilter === 'all' || l.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
+
+  const leadsByStatus = {
+    New: leads.filter(l => l.status === 'New').length,
+    Contacted: leads.filter(l => l.status === 'Contacted').length,
+    Closed: leads.filter(l => l.status === 'Closed').length,
+    Discarded: leads.filter(l => l.status === 'Discarded').length
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 flex flex-col lg:flex-row">
+      
+      {/* Sidebar */}
+      <aside className="w-full lg:w-72 bg-navy text-white flex flex-col shrink-0">
+        <div className="p-8 border-b border-white/10">
+          <Logo className="h-8 w-auto text-white" />
+          <p className="text-[10px] font-bold text-gold mt-2 uppercase tracking-[0.2em]">Panel Administrativo</p>
+          <div className="mt-3 px-3 py-2 bg-white/10 rounded-lg">
+            <p className="text-[10px] text-gray-400 uppercase">Rol Actual</p>
+            <p className="text-sm font-bold text-white capitalize">
+              {isSuperAdmin() ? 'Super Administrador' : 
+               isAdmin() ? 'Administrador' : 
+               getUserRole() || 'Usuario'}
+            </p>
+          </div>
+        </div>
+
+        <nav className="flex-grow p-4 space-y-2 mt-4">
+          {[
+            { id: 'overview', icon: BarChart3, label: 'Dashboard', permission: 'view_dashboard' },
+            { id: 'properties', icon: Building, label: 'Propiedades', permission: 'manage_properties' },
+            { id: 'leads', icon: Users, label: 'Leads & CRM', permission: 'manage_leads' },
+            { id: 'users', icon: UserCog, label: 'Usuarios', permission: 'manage_users', adminOnly: true },
+            { id: 'settings', icon: Settings, label: 'Configuracion', permission: 'manage_settings', adminOnly: true }
+          ].filter(tab => {
+            // Admin only tabs
+            if (tab.adminOnly && !isAdmin()) return false;
+            // Permission check
+            return hasPermission(tab.permission) || isAdmin();
+          }).map(tab => (
+            <button 
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as TabType)}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${activeTab === tab.id ? 'bg-gold text-white shadow-lg' : 'hover:bg-white/5 text-gray-400'}`}
+            >
+              <tab.icon size={20} /> <span className="font-medium">{tab.label}</span>
+            </button>
+          ))}
+        </nav>
+
+        <div className="p-4 border-t border-white/10">
+          <div className="px-4 py-2 mb-2 bg-white/5 rounded-lg">
+            <p className="text-[10px] text-gray-400 uppercase">Conectado a</p>
+            <p className="text-sm font-bold text-gold">Supabase</p>
+          </div>
+          <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-red-500/10 text-red-400 transition-all">
+            <LogOut size={20} /> <span className="font-medium">Cerrar Sesion</span>
+          </button>
+        </div>
+      </aside>
+
+      {/* Main Content */}
+      <main className="flex-grow p-6 lg:p-10 overflow-y-auto max-h-screen">
+        
+        <header className="flex justify-between items-center mb-10">
+          <div>
+            <h1 className="text-3xl font-serif font-bold text-navy capitalize">
+              {activeTab === 'overview' ? 'Vista General' : 
+               activeTab === 'properties' ? 'Gestion de Inmuebles' : 
+               activeTab === 'leads' ? 'Panel de Leads' :
+               activeTab === 'users' ? 'Gestion de Usuarios' : 'Configuracion'}
+            </h1>
+            <p className="text-gray-500 text-sm mt-1">RUZZI v2.0 - Sistema de Gestion Inmobiliaria</p>
+          </div>
+          <div className="flex gap-4">
+            <RealtimeStatus className="hidden md:flex bg-white px-4 py-2 rounded-lg border border-gray-200" />
+            <div className="hidden md:flex items-center gap-3 bg-white px-4 py-2 rounded-lg border border-gray-200">
+               <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+               <span className="text-xs font-bold text-navy uppercase tracking-tighter">Supabase: Activo</span>
+            </div>
+          </div>
+        </header>
+
+        {/* Overview Tab */}
+        {activeTab === 'overview' && (
+          <div className="space-y-10 animate-in fade-in duration-500">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {[
+                { label: 'Leads Totales', value: stats.totalLeads, icon: <Users className="text-blue-500" />, trend: '+12%', up: true },
+                { label: 'Propiedades', value: stats.activeProperties, icon: <Building className="text-gold" />, trend: '0%', up: null },
+                { label: 'Visitas Web', value: stats.totalViews.toLocaleString(), icon: <BarChart3 className="text-purple-500" />, trend: '+8.4%', up: true },
+                { label: 'Conv. Rate', value: `${stats.conversionRate}%`, icon: <CheckCircle className="text-green-500" />, trend: '+0.2%', up: true }
+              ].map((stat, idx) => (
+                <div key={idx} className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="p-3 bg-gray-50 rounded-lg">{stat.icon}</div>
+                    <div className={`flex items-center text-xs font-bold ${stat.up === true ? 'text-green-500' : 'text-gray-400'}`}>
+                      {stat.up && <ArrowUpRight size={14} />}
+                      {stat.trend}
+                    </div>
+                  </div>
+                  <h3 className="text-3xl font-bold text-navy">{stat.value}</h3>
+                  <p className="text-gray-400 text-xs font-semibold uppercase mt-1">{stat.label}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Lead Status Summary */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              {Object.entries(leadsByStatus).map(([status, count]) => (
+                <div key={status} className={`p-4 rounded-lg ${
+                  status === 'New' ? 'bg-blue-50 border-blue-200' :
+                  status === 'Contacted' ? 'bg-yellow-50 border-yellow-200' :
+                  status === 'Closed' ? 'bg-green-50 border-green-200' :
+                  'bg-gray-50 border-gray-200'
+                } border`}>
+                  <p className="text-2xl font-bold text-navy">{count}</p>
+                  <p className="text-xs font-semibold uppercase text-gray-500">{status}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Recent Leads */}
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+               <div className="p-6 border-b border-gray-50 flex justify-between items-center">
+                  <h3 className="font-serif font-bold text-navy text-xl">Leads Recientes</h3>
+                  <button onClick={() => setActiveTab('leads')} className="text-gold text-sm font-bold hover:underline">Ver Todos</button>
+               </div>
+               <div className="divide-y divide-gray-50">
+                  {leads.slice(0, 5).map(lead => (
+                    <div key={lead.id} className="p-6 flex items-center justify-between hover:bg-gray-50 transition-colors">
+                        <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 bg-navy/5 rounded-full flex items-center justify-center text-navy font-bold">{lead.name.charAt(0)}</div>
+                            <div>
+                                <p className="font-bold text-navy">{lead.name}</p>
+                                <p className="text-xs text-gray-500">{lead.email}</p>
+                            </div>
+                        </div>
+                        <span className={`text-[10px] px-3 py-1 rounded-full font-bold uppercase ${lead.status === 'New' ? 'bg-blue-100 text-blue-600' : lead.status === 'Contacted' ? 'bg-gold/20 text-gold-dark' : 'bg-green-100 text-green-600'}`}>
+                            {lead.status}
+                        </span>
+                        <div className="text-right">
+                            <p className="text-sm font-medium text-navy">{lead.date}</p>
+                        </div>
+                    </div>
+                  ))}
+               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Properties Tab */}
+        {activeTab === 'properties' && (
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm animate-in fade-in duration-500">
+             <div className="p-6 border-b border-gray-50 flex flex-col md:flex-row gap-4 justify-between">
+                <div className="relative flex-grow max-w-md">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                    <input 
+                      type="text" 
+                      placeholder="Buscar inmueble..." 
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-1 focus:ring-gold" 
+                    />
+                </div>
+                <Button size="sm" onClick={() => setShowPropertyModal(true)} disabled={!hasPermission('manage_properties') && !isAdmin()}>
+                    <Plus size={18} className="mr-2" /> Nuevo Inmueble
+                </Button>
+             </div>
+             
+             <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                    <thead className="bg-gray-50 text-gray-400 text-[10px] uppercase font-bold">
+                        <tr>
+                            <th className="px-6 py-4">Inmueble</th>
+                            <th className="px-6 py-4">Ubicacion</th>
+                            <th className="px-6 py-4">Precio</th>
+                            <th className="px-6 py-4">Detalles</th>
+                            <th className="px-6 py-4">Estado</th>
+                            <th className="px-6 py-4 text-right">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                        {filteredProperties.map(prop => (
+                            <tr key={prop.id} className="hover:bg-gray-50/50 transition-colors">
+                                <td className="px-6 py-4">
+                                    <div className="flex items-center gap-3">
+                                        <img src={prop.image || 'https://via.placeholder.com/48'} className="w-12 h-12 rounded object-cover shadow-sm" alt="prop" />
+                                        <div>
+                                            <p className="font-bold text-navy leading-tight">{prop.title}</p>
+                                            <p className="text-[10px] text-gray-400 uppercase font-bold">{prop.type}</p>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td className="px-6 py-4 text-sm text-gray-600">
+                                  <div className="flex items-center gap-1">
+                                    <MapPin size={14} className="text-gray-400" />
+                                    {prop.location}
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4 font-bold text-gold">${prop.price.toLocaleString()}</td>
+                                <td className="px-6 py-4 text-sm text-gray-500">
+                                  {prop.bedrooms} hab | {prop.bathrooms} banos | {prop.area}m2
+                                </td>
+                                <td className="px-6 py-4">
+                                    <span className={`text-[10px] px-2 py-1 rounded-full font-bold uppercase ${prop.status === 'For Sale' ? 'bg-green-100 text-green-700' : prop.status === 'Sold' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`}>
+                                        {prop.status}
+                                    </span>
+                                </td>
+                                <td className="px-6 py-4 text-right">
+                                    <div className="flex gap-2 justify-end">
+                                        <button className="p-2 text-gray-400 hover:text-blue-500 transition-colors" title="Ver">
+                                          <Eye size={16}/>
+                                        </button>
+                                        {(hasPermission('manage_properties') || isAdmin()) && (
+                                          <button className="p-2 text-gray-400 hover:text-navy transition-colors" title="Editar">
+                                            <Edit2 size={16}/>
+                                          </button>
+                                        )}
+                                        {(hasPermission('manage_properties') || isAdmin()) && (
+                                          <button onClick={() => handleDeleteProperty(prop.id)} className="p-2 text-gray-400 hover:text-red-500 transition-colors" title="Eliminar">
+                                            <Trash2 size={16}/>
+                                          </button>
+                                        )}
+                                    </div>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+             </div>
+          </div>
+        )}
+
+        {/* Leads Tab */}
+        {activeTab === 'leads' && (
+          <div className="space-y-6 animate-in fade-in duration-500">
+            {/* Filters */}
+            <div className="bg-white p-4 rounded-xl border border-gray-100 flex flex-wrap gap-4 items-center">
+              <div className="relative flex-grow max-w-md">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                <input 
+                  type="text" 
+                  placeholder="Buscar lead..." 
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-1 focus:ring-gold" 
+                />
+              </div>
+              <select 
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-1 focus:ring-gold"
+              >
+                <option value="all">Todos los estados</option>
+                <option value="New">Nuevos</option>
+                <option value="Contacted">Contactados</option>
+                <option value="Closed">Cerrados</option>
+                <option value="Discarded">Descartados</option>
+              </select>
+            </div>
+
+            {/* Lead Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredLeads.map(lead => (
+                <div key={lead.id} className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm flex flex-col">
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="w-12 h-12 bg-navy/5 text-navy rounded-lg flex items-center justify-center font-bold text-xl uppercase">
+                      {lead.name.charAt(0)}
+                    </div>
+                    <select 
+                      value={lead.status}
+                      onChange={(e) => handleStatusChange(lead.id, e.target.value as Lead['status'])}
+                      className={`text-[10px] px-3 py-1.5 rounded-full font-bold uppercase outline-none cursor-pointer border-none shadow-sm ${
+                        lead.status === 'New' ? 'bg-blue-500 text-white' : 
+                        lead.status === 'Contacted' ? 'bg-gold text-white' : 
+                        lead.status === 'Closed' ? 'bg-green-600 text-white' : 'bg-gray-400 text-white'
+                      }`}
+                    >
+                      <option value="New">Nuevo</option>
+                      <option value="Contacted">Contactado</option>
+                      <option value="Closed">Cerrado</option>
+                      <option value="Discarded">Descartado</option>
+                    </select>
+                  </div>
+                  <h4 className="font-bold text-navy text-lg">{lead.name}</h4>
+                  <p className="text-xs text-gold font-bold mb-4 tracking-wider uppercase">{lead.type}</p>
+                  <p className="text-sm text-gray-600 italic mb-6 leading-relaxed line-clamp-3">"{lead.message}"</p>
+                  
+                  <div className="mt-auto pt-6 border-t border-gray-50 flex flex-col gap-2">
+                    <div className="flex items-center gap-2 text-xs text-gray-500 font-medium">
+                      <Mail size={14} className="text-gray-400" /> {lead.email}
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-gray-500 font-medium">
+                      <Phone size={14} className="text-gray-400" /> {lead.phone}
+                    </div>
+                    <p className="text-[10px] text-gray-400 font-bold uppercase mt-2">
+                      <Calendar size={12} className="inline mr-1" /> {lead.date}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Users Tab */}
+        {activeTab === 'users' && (
+          <div className="space-y-6 animate-in fade-in duration-500">
+            <div className="bg-white rounded-xl border border-gray-100 p-6">
+              <div className="flex items-center gap-4 mb-6">
+                <Shield className="text-gold" size={32} />
+                <div>
+                  <h3 className="font-bold text-navy text-xl">Sistema de Roles</h3>
+                  <p className="text-gray-500 text-sm">Gestion de usuarios y permisos</p>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {[
+                  { name: 'Super Admin', desc: 'Acceso total al sistema', color: 'bg-red-500' },
+                  { name: 'Admin', desc: 'Gestion completa sin eliminar', color: 'bg-orange-500' },
+                  { name: 'Sales Manager', desc: 'Leads y equipo de ventas', color: 'bg-blue-500' },
+                  { name: 'Agent', desc: 'Leads asignados solamente', color: 'bg-green-500' },
+                  { name: 'Marketing', desc: 'Contenido y campanas', color: 'bg-purple-500' }
+                ].map(role => (
+                  <div key={role.name} className="p-4 bg-gray-50 rounded-lg border border-gray-100">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className={`w-3 h-3 rounded-full ${role.color}`}></div>
+                      <p className="font-bold text-navy">{role.name}</p>
+                    </div>
+                    <p className="text-xs text-gray-500">{role.desc}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-8 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <p className="text-sm text-blue-800">
+                  <strong>Nota:</strong> Para gestionar usuarios, cree cuentas en Supabase Auth y asigne roles en la tabla user_roles.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Settings Tab */}
+        {activeTab === 'settings' && (
+          <div className="space-y-6 animate-in fade-in duration-500">
+            <div className="bg-white rounded-xl border border-gray-100 p-6">
+              <h3 className="font-bold text-navy text-xl mb-6">Configuracion del Sistema</h3>
+              
+              <div className="space-y-4">
+                <div className="p-4 bg-gray-50 rounded-lg">
+                  <p className="font-semibold text-navy mb-1">URL de Supabase</p>
+                  <p className="text-sm text-gray-500 font-mono">{import.meta.env.VITE_SUPABASE_URL}</p>
+                </div>
+                
+                <div className="p-4 bg-gray-50 rounded-lg">
+                  <p className="font-semibold text-navy mb-1">Tipos de Propiedad</p>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {propertyTypes.map(pt => (
+                      <span key={pt.id} className="px-3 py-1 bg-white rounded-full text-xs font-medium text-navy border">
+                        {pt.display_name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="p-4 bg-gray-50 rounded-lg">
+                  <p className="font-semibold text-navy mb-1">Desarrollos Activos</p>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {developments.map(d => (
+                      <span key={d.id} className="px-3 py-1 bg-white rounded-full text-xs font-medium text-navy border">
+                        {d.name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="p-4 bg-gray-50 rounded-lg">
+                  <p className="font-semibold text-navy mb-1">Fuentes de Leads</p>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {leadSources.map(ls => (
+                      <span key={ls.id} className="px-3 py-1 bg-white rounded-full text-xs font-medium text-navy border">
+                        {ls.display_name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+      </main>
+
+      {/* Property Modal */}
+      {showPropertyModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-gray-100 flex justify-between items-center sticky top-0 bg-white">
+              <h3 className="font-bold text-navy text-xl">Nueva Propiedad</h3>
+              <button onClick={() => { setShowPropertyModal(false); resetForm(); }} className="text-gray-400 hover:text-navy">
+                <X size={24} />
+              </button>
+            </div>
+            
+            <form onSubmit={handlePropertySubmit} className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-navy mb-1">Titulo</label>
+                <input 
+                  type="text" 
+                  required
+                  value={formData.title}
+                  onChange={(e) => setFormData({...formData, title: e.target.value})}
+                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-1 focus:ring-gold outline-none"
+                  placeholder="Ej: Residencia Premium Centro"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-navy mb-1">Descripcion</label>
+                <textarea 
+                  rows={3}
+                  value={formData.description}
+                  onChange={(e) => setFormData({...formData, description: e.target.value})}
+                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-1 focus:ring-gold outline-none resize-none"
+                  placeholder="Descripcion detallada de la propiedad..."
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-navy mb-1">Precio</label>
+                  <div className="relative">
+                    <DollarSign size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input 
+                      type="number" 
+                      required
+                      value={formData.price}
+                      onChange={(e) => setFormData({...formData, price: parseFloat(e.target.value)})}
+                      className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-1 focus:ring-gold outline-none"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-navy mb-1">Moneda</label>
+                  <select 
+                    value={formData.currency}
+                    onChange={(e) => setFormData({...formData, currency: e.target.value})}
+                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-1 focus:ring-gold outline-none"
+                  >
+                    <option value="USD">USD</option>
+                    <option value="ARS">ARS</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-navy mb-1">Direccion</label>
+                <div className="relative">
+                  <MapPin size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input 
+                    type="text" 
+                    value={formData.address}
+                    onChange={(e) => setFormData({...formData, address: e.target.value})}
+                    className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-1 focus:ring-gold outline-none"
+                    placeholder="Direccion completa"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-navy mb-1">Area (m2)</label>
+                  <input 
+                    type="number" 
+                    value={formData.area_total}
+                    onChange={(e) => setFormData({...formData, area_total: parseFloat(e.target.value)})}
+                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-1 focus:ring-gold outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-navy mb-1">Habitaciones</label>
+                  <input 
+                    type="number" 
+                    value={formData.bedrooms}
+                    onChange={(e) => setFormData({...formData, bedrooms: parseInt(e.target.value)})}
+                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-1 focus:ring-gold outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-navy mb-1">Banos</label>
+                  <input 
+                    type="number" 
+                    value={formData.bathrooms}
+                    onChange={(e) => setFormData({...formData, bathrooms: parseInt(e.target.value)})}
+                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-1 focus:ring-gold outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-navy mb-1">Tipo de Propiedad</label>
+                  <select 
+                    value={formData.property_type_id}
+                    onChange={(e) => setFormData({...formData, property_type_id: e.target.value})}
+                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-1 focus:ring-gold outline-none"
+                  >
+                    <option value="">Seleccionar...</option>
+                    {propertyTypes.map(pt => (
+                      <option key={pt.id} value={pt.id}>{pt.display_name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-navy mb-1">Desarrollo</label>
+                  <select 
+                    value={formData.development_id}
+                    onChange={(e) => setFormData({...formData, development_id: e.target.value})}
+                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-1 focus:ring-gold outline-none"
+                  >
+                    <option value="">Ninguno</option>
+                    {developments.map(d => (
+                      <option key={d.id} value={d.id}>{d.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-navy mb-1">Imagenes</label>
+                <div className="border-2 border-dashed border-gray-200 rounded-lg p-6 text-center">
+                  <input 
+                    type="file" 
+                    multiple 
+                    accept="image/*"
+                    onChange={(e) => setSelectedFiles(Array.from(e.target.files || []))}
+                    className="hidden" 
+                    id="images-upload"
+                  />
+                  <label htmlFor="images-upload" className="cursor-pointer">
+                    <Upload className="mx-auto text-gray-400 mb-2" size={32} />
+                    <p className="text-sm text-gray-500">Click para seleccionar imagenes</p>
+                    {selectedFiles.length > 0 && (
+                      <p className="text-xs text-gold mt-2">{selectedFiles.length} archivo(s) seleccionado(s)</p>
+                    )}
+                  </label>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <input 
+                  type="checkbox" 
+                  id="featured"
+                  checked={formData.is_featured}
+                  onChange={(e) => setFormData({...formData, is_featured: e.target.checked})}
+                  className="w-4 h-4 rounded border-gray-300"
+                />
+                <label htmlFor="featured" className="text-sm text-navy">Marcar como destacada</label>
+              </div>
+
+              <div className="flex gap-4 pt-4">
+                <Button type="button" variant="outline" onClick={() => { setShowPropertyModal(false); resetForm(); }} className="flex-1">
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={uploading} className="flex-1">
+                  {uploading ? 'Guardando...' : 'Guardar Propiedad'}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default AdminDashboard;

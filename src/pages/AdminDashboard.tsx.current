@@ -1,0 +1,677 @@
+
+import React, { useState, useEffect } from 'react';
+import { 
+  Users, Building, BarChart3, Plus, Search, 
+  LogOut, CheckCircle, MessageSquare, Edit2, Trash2, 
+  ArrowUpRight, X, Save, Upload, MapPin, DollarSign,
+  Shield, UserCog, Calendar, Phone, Mail, Eye, Settings
+} from 'lucide-react';
+import Logo from '../components/Logo';
+import { useNavigate } from 'react-router-dom';
+import { useApp } from '../context/AppContext';
+import { Property, Lead, PropertyFormData } from '../types';
+import Button from '../components/Button';
+import { supabase } from '../lib/supabase';
+import { usePropertyTypes, useDevelopments, useLeadSources } from '../hooks/useSupabase';
+import { useImageUpload } from '../hooks/useImageUpload';
+import { useRolePermissions } from '../hooks/useUserProfile';
+import RealtimeStatus from '../components/RealtimeStatus';
+import PropertyModal from '../components/properties/PropertyModal';
+// import PropertyFilters from '../components/properties/PropertyFilters';
+
+type TabType = 'overview' | 'properties' | 'leads' | 'users' | 'settings';
+
+const AdminDashboard = () => {
+  const [activeTab, setActiveTab] = useState<TabType>('overview');
+  const [showPropertyModal, setShowPropertyModal] = useState(false);
+  const [editingProperty, setEditingProperty] = useState<Property | null>(null);
+  const [modalMode, setModalMode] = useState<'create' | 'edit' | 'view'>('create');
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{ [key: string]: number }>({});
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState({
+    search: '',
+    priceMin: null as number | null,
+    priceMax: null as number | null,
+    location: '',
+    propertyType: '',
+    development: '',
+    status: '',
+    bedrooms: null as number | null,
+    bathrooms: null as number | null,
+    areaMin: null as number | null,
+    areaMax: null as number | null,
+    featured: null as boolean | null,
+    sortBy: 'date_desc' as 'price_asc' | 'price_desc' | 'date_asc' | 'date_desc' | 'area_asc' | 'area_desc'
+  });
+  
+  const { properties, leads, stats, updateLeadStatus, deleteProperty, addProperty, updateProperty, logout, loading, realtimeConnected } = useApp();
+  const { propertyTypes } = usePropertyTypes();
+  const { developments } = useDevelopments();
+  const { leadSources } = useLeadSources();
+  const { uploadMultipleImages, uploading: uploadLoading, error: uploadError } = useImageUpload();
+  const { hasPermission, isSuperAdmin, isAdmin, getUserRole } = useRolePermissions();
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login');
+  };
+
+  const handleDeleteProperty = async (id: string) => {
+    if (window.confirm('Esta seguro de eliminar esta propiedad? Esta accion no se puede deshacer.')) {
+      await deleteProperty(id);
+    }
+  };
+
+  const handleStatusChange = async (leadId: string, newStatus: Lead['status']) => {
+    await updateLeadStatus(leadId, newStatus);
+  };
+
+  // Property modal handlers
+  const handlePropertySave = async (propertyData: PropertyFormData, files: File[]) => {
+    setUploading(true);
+    
+    try {
+      const { data: newProp, error } = await supabase
+        .from('properties')
+        .insert({
+          title: propertyData.title,
+          description: propertyData.description,
+          price: propertyData.price,
+          currency: propertyData.currency,
+          address: propertyData.address,
+          area_total: propertyData.area_total,
+          bedrooms: propertyData.bedrooms,
+          bathrooms: propertyData.bathrooms,
+          property_type_id: propertyData.property_type_id || null,
+          development_id: propertyData.development_id || null,
+          status: propertyData.status,
+          is_featured: propertyData.is_featured,
+          is_published: true
+        })
+        .select()
+        .maybeSingle();
+
+      if (error) throw error;
+
+      // Upload images if any
+      if (newProp && files.length > 0) {
+        await uploadMultipleImages(files, newProp.id);
+      }
+
+      setShowPropertyModal(false);
+      setEditingProperty(null);
+      // Refresh will be handled by the app context
+    } catch (err) {
+      console.error('Error creating property:', err);
+      throw err;
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handlePropertyUpdate = async (property: Property, propertyData: PropertyFormData) => {
+    setUploading(true);
+    
+    try {
+      // Map PropertyFormData to Property format
+      const updates = {
+        title: propertyData.title,
+        description: propertyData.description,
+        price: propertyData.price,
+        currency: propertyData.currency,
+        location: propertyData.address, // Map address to location
+        area: propertyData.area_total, // Map area_total to area
+        bedrooms: propertyData.bedrooms,
+        bathrooms: propertyData.bathrooms,
+        status: propertyData.status === 'available' ? 'For Sale' as const : 
+                propertyData.status === 'sold' ? 'Sold' as const : 'For Sale' as const,
+        featured: propertyData.is_featured
+      };
+
+      const { error } = await supabase
+        .from('properties')
+        .update(updates)
+        .eq('id', property.id);
+
+      if (error) throw error;
+
+      setShowPropertyModal(false);
+      setEditingProperty(null);
+      // Refresh will be handled by the app context
+    } catch (err) {
+      console.error('Error updating property:', err);
+      throw err;
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const openPropertyModal = (mode: 'create' | 'edit' | 'view', property?: Property) => {
+    setModalMode(mode);
+    setEditingProperty(property || null);
+    setShowPropertyModal(true);
+  };
+
+  const closePropertyModal = () => {
+    setShowPropertyModal(false);
+    setEditingProperty(null);
+  };
+
+  // Filter handlers
+  const handleFiltersChange = (newFilters: typeof filters) => {
+    setFilters(newFilters);
+    setSearchTerm(newFilters.search);
+  };
+
+  const handleFiltersReset = () => {
+    const resetFilters = {
+      search: '',
+      priceMin: null as number | null,
+      priceMax: null as number | null,
+      location: '',
+      propertyType: '',
+      development: '',
+      status: '',
+      bedrooms: null as number | null,
+      bathrooms: null as number | null,
+      areaMin: null as number | null,
+      areaMax: null as number | null,
+      featured: null as boolean | null,
+      sortBy: 'date_desc' as 'price_asc' | 'price_desc' | 'date_asc' | 'date_desc' | 'area_asc' | 'area_desc'
+    };
+    setFilters(resetFilters);
+    setSearchTerm('');
+  };
+
+  // Apply filters to properties (simplified for debugging)
+  const sortedProperties = properties.filter(p => {
+    // Simple search filter
+    if (filters.search) {
+      const searchLower = filters.search.toLowerCase();
+      if (!p.title.toLowerCase().includes(searchLower) && 
+          !p.location.toLowerCase().includes(searchLower)) {
+        return false;
+      }
+    }
+    return true;
+  });
+
+  const filteredLeads = leads.filter(l => {
+    const matchesSearch = l.client_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         l.client_email.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = statusFilter === 'all' || l.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
+
+  const leadsByStatus = {
+    pending: leads.filter(l => l.status === 'pending').length,
+    confirmed: leads.filter(l => l.status === 'confirmed').length,
+    cancelled: leads.filter(l => l.status === 'cancelled').length,
+    completed: leads.filter(l => l.status === 'completed').length
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 flex flex-col lg:flex-row">
+      
+      {/* Sidebar */}
+      <aside className="w-full lg:w-72 bg-navy text-white flex flex-col shrink-0">
+        <div className="p-8 border-b border-white/10">
+          <Logo className="h-8 w-auto text-white" />
+          <p className="text-[10px] font-bold text-gold mt-2 uppercase tracking-[0.2em]">Panel Administrativo</p>
+          <div className="mt-3 px-3 py-2 bg-white/10 rounded-lg">
+            <p className="text-[10px] text-gray-400 uppercase">Rol Actual</p>
+            <p className="text-sm font-bold text-white capitalize">
+              {isSuperAdmin() ? 'Super Administrador' : 
+               isAdmin() ? 'Administrador' : 
+               getUserRole() || 'Usuario'}
+            </p>
+          </div>
+        </div>
+
+        <nav className="flex-grow p-4 space-y-2 mt-4">
+          {[
+            { id: 'overview', icon: BarChart3, label: 'Dashboard', permission: 'view_dashboard' },
+            { id: 'properties', icon: Building, label: 'Propiedades', permission: 'manage_properties' },
+            { id: 'leads', icon: Users, label: 'Leads & CRM', permission: 'manage_leads' },
+            { id: 'users', icon: UserCog, label: 'Usuarios', permission: 'manage_users', adminOnly: true },
+            { id: 'settings', icon: Settings, label: 'Configuracion', permission: 'manage_settings', adminOnly: true }
+          ].filter(tab => {
+            // Admin only tabs
+            if (tab.adminOnly && !isAdmin()) return false;
+            // Permission check
+            return hasPermission(tab.permission) || isAdmin();
+          }).map(tab => (
+            <button 
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as TabType)}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${activeTab === tab.id ? 'bg-gold text-white shadow-lg' : 'hover:bg-white/5 text-gray-400'}`}
+            >
+              <tab.icon size={20} /> <span className="font-medium">{tab.label}</span>
+            </button>
+          ))}
+        </nav>
+
+        <div className="p-4 border-t border-white/10">
+          <div className="px-4 py-2 mb-2 bg-white/5 rounded-lg">
+            <p className="text-[10px] text-gray-400 uppercase">Conectado a</p>
+            <p className="text-sm font-bold text-gold">Supabase</p>
+          </div>
+          <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-red-500/10 text-red-400 transition-all">
+            <LogOut size={20} /> <span className="font-medium">Cerrar Sesion</span>
+          </button>
+        </div>
+      </aside>
+
+      {/* Main Content */}
+      <main className="flex-grow p-6 lg:p-10 overflow-y-auto max-h-screen">
+        
+        <header className="flex justify-between items-center mb-10">
+          <div>
+            <h1 className="text-3xl font-serif font-bold text-navy capitalize">
+              {activeTab === 'overview' ? 'Vista General' : 
+               activeTab === 'properties' ? 'Gestion de Inmuebles' : 
+               activeTab === 'leads' ? 'Panel de Leads' :
+               activeTab === 'users' ? 'Gestion de Usuarios' : 'Configuracion'}
+            </h1>
+            <p className="text-gray-500 text-sm mt-1">RUZZI v2.0 - Sistema de Gestion Inmobiliaria</p>
+          </div>
+          <div className="flex gap-4">
+            <RealtimeStatus className="hidden md:flex bg-white px-4 py-2 rounded-lg border border-gray-200" />
+            <div className="hidden md:flex items-center gap-3 bg-white px-4 py-2 rounded-lg border border-gray-200">
+               <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+               <span className="text-xs font-bold text-navy uppercase tracking-tighter">Supabase: Activo</span>
+            </div>
+          </div>
+        </header>
+
+        {/* Overview Tab */}
+        {activeTab === 'overview' && (
+          <div className="space-y-10 animate-in fade-in duration-500">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {[
+                { label: 'Leads Totales', value: stats.totalLeads, icon: <Users className="text-blue-500" />, trend: '+12%', up: true },
+                { label: 'Propiedades', value: stats.activeProperties, icon: <Building className="text-gold" />, trend: '0%', up: null },
+                { label: 'Visitas Web', value: stats.totalViews.toLocaleString(), icon: <BarChart3 className="text-purple-500" />, trend: '+8.4%', up: true },
+                { label: 'Conv. Rate', value: `${stats.conversionRate}%`, icon: <CheckCircle className="text-green-500" />, trend: '+0.2%', up: true }
+              ].map((stat, idx) => (
+                <div key={idx} className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="p-3 bg-gray-50 rounded-lg">{stat.icon}</div>
+                    <div className={`flex items-center text-xs font-bold ${stat.up === true ? 'text-green-500' : 'text-gray-400'}`}>
+                      {stat.up && <ArrowUpRight size={14} />}
+                      {stat.trend}
+                    </div>
+                  </div>
+                  <h3 className="text-3xl font-bold text-navy">{stat.value}</h3>
+                  <p className="text-gray-400 text-xs font-semibold uppercase mt-1">{stat.label}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Lead Status Summary */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              {Object.entries(leadsByStatus).map(([status, count]) => (
+                <div key={status} className={`p-4 rounded-lg ${
+                  status === 'pending' ? 'bg-blue-50 border-blue-200' :
+                  status === 'confirmed' ? 'bg-yellow-50 border-yellow-200' :
+                  status === 'cancelled' ? 'bg-red-50 border-red-200' :
+                  status === 'completed' ? 'bg-green-50 border-green-200' :
+                  'bg-gray-50 border-gray-200'
+                } border`}>
+                  <p className="text-2xl font-bold text-navy">{count}</p>
+                  <p className="text-xs font-semibold uppercase text-gray-500">{status}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Recent Leads */}
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+               <div className="p-6 border-b border-gray-50 flex justify-between items-center">
+                  <h3 className="font-serif font-bold text-navy text-xl">Leads Recientes</h3>
+                  <button onClick={() => setActiveTab('leads')} className="text-gold text-sm font-bold hover:underline">Ver Todos</button>
+               </div>
+               <div className="divide-y divide-gray-50">
+                  {leads.slice(0, 5).map(lead => (
+                    <div key={lead.id} className="p-6 flex items-center justify-between hover:bg-gray-50 transition-colors">
+                        <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 bg-navy/5 rounded-full flex items-center justify-center text-navy font-bold">{lead.client_name.charAt(0)}</div>
+                            <div>
+                                <p className="font-bold text-navy">{lead.client_name}</p>
+                                <p className="text-xs text-gray-500">{lead.client_email}</p>
+                            </div>
+                        </div>
+                        <span className={`text-[10px] px-3 py-1 rounded-full font-bold uppercase ${lead.status === 'pending' ? 'bg-blue-100 text-blue-600' : lead.status === 'confirmed' ? 'bg-gold/20 text-gold-dark' : lead.status === 'cancelled' ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
+                            {lead.status}
+                        </span>
+                        <div className="text-right">
+                            <p className="text-sm font-medium text-navy">{lead.date}</p>
+                        </div>
+                    </div>
+                  ))}
+               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Properties Tab */}
+        {activeTab === 'properties' && (
+          <div className="space-y-6 animate-in fade-in duration-500">
+            {/* Property Filters - TEMPORARILY DISABLED FOR DEBUGGING */}
+            {/*
+            <PropertyFilters
+              filters={filters}
+              onFiltersChange={handleFiltersChange}
+              onReset={handleFiltersReset}
+              isOpen={showFilters}
+              onToggle={() => setShowFilters(!showFilters)}
+              propertyCount={sortedProperties.length}
+              totalCount={properties.length}
+            />
+            */}
+
+            {/* Simple Search Bar */}
+            <div className="bg-white p-4 rounded-xl border border-gray-100 flex gap-4 items-center">
+              <div className="relative flex-grow max-w-md">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                <input 
+                  type="text" 
+                  placeholder="Buscar inmueble..." 
+                  value={filters.search}
+                  onChange={(e) => handleFiltersChange({...filters, search: e.target.value})}
+                  className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-1 focus:ring-gold" 
+                />
+              </div>
+              <Button 
+                size="sm" 
+                onClick={() => openPropertyModal('create')} 
+                disabled={!hasPermission('manage_properties') && !isAdmin()}
+              >
+                <Plus size={18} className="mr-2" /> Nuevo Inmueble
+              </Button>
+            </div>
+
+            {/* Properties Table */}
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm">
+              <div className="p-6 border-b border-gray-50">
+                <div className="flex items-center gap-4">
+                  <h3 className="font-serif font-bold text-navy text-xl">Gestión de Propiedades</h3>
+                  <span className="text-sm text-gray-500">
+                    {sortedProperties.length} de {properties.length} propiedades
+                  </span>
+                </div>
+              </div>
+             
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                    <thead className="bg-gray-50 text-gray-400 text-[10px] uppercase font-bold">
+                        <tr>
+                            <th className="px-6 py-4">Inmueble</th>
+                            <th className="px-6 py-4">Ubicacion</th>
+                            <th className="px-6 py-4">Precio</th>
+                            <th className="px-6 py-4">Detalles</th>
+                            <th className="px-6 py-4">Estado</th>
+                            <th className="px-6 py-4 text-right">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                        {sortedProperties.map(prop => (
+                            <tr key={prop.id} className="hover:bg-gray-50/50 transition-colors">
+                                <td className="px-6 py-4">
+                                    <div className="flex items-center gap-3">
+                                        <img src={prop.image || 'https://via.placeholder.com/48'} className="w-12 h-12 rounded object-cover shadow-sm" alt="prop" />
+                                        <div>
+                                            <p className="font-bold text-navy leading-tight">{prop.title}</p>
+                                            <p className="text-[10px] text-gray-400 uppercase font-bold">{prop.type}</p>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td className="px-6 py-4 text-sm text-gray-600">
+                                  <div className="flex items-center gap-1">
+                                    <MapPin size={14} className="text-gray-400" />
+                                    {prop.location}
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4 font-bold text-gold">${prop.price.toLocaleString()}</td>
+                                <td className="px-6 py-4 text-sm text-gray-500">
+                                  {prop.bedrooms} hab | {prop.bathrooms} banos | {prop.area}m2
+                                </td>
+                                <td className="px-6 py-4">
+                                    <span className={`text-[10px] px-2 py-1 rounded-full font-bold uppercase ${prop.status === 'For Sale' ? 'bg-green-100 text-green-700' : prop.status === 'Sold' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`}>
+                                        {prop.status}
+                                    </span>
+                                </td>
+                                <td className="px-6 py-4 text-right">
+                                    <div className="flex gap-2 justify-end">
+                                        <button 
+                                          onClick={() => openPropertyModal('view', prop)} 
+                                          className="p-2 text-gray-400 hover:text-blue-500 transition-colors" 
+                                          title="Ver"
+                                        >
+                                          <Eye size={16}/>
+                                        </button>
+                                        {(hasPermission('manage_properties') || isAdmin()) && (
+                                          <button 
+                                            onClick={() => openPropertyModal('edit', prop)} 
+                                            className="p-2 text-gray-400 hover:text-navy transition-colors" 
+                                            title="Editar"
+                                          >
+                                            <Edit2 size={16}/>
+                                          </button>
+                                        )}
+                                        {(hasPermission('manage_properties') || isAdmin()) && (
+                                          <button 
+                                            onClick={() => handleDeleteProperty(prop.id)} 
+                                            className="p-2 text-gray-400 hover:text-red-500 transition-colors" 
+                                            title="Eliminar"
+                                          >
+                                            <Trash2 size={16}/>
+                                          </button>
+                                        )}
+                                    </div>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+                
+                {sortedProperties.length === 0 && (
+                  <div className="text-center py-12">
+                    <Building className="mx-auto text-gray-300 mb-4" size={48} />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">No se encontraron propiedades</h3>
+                    <p className="text-gray-500 mb-4">Intenta ajustar los filtros o crear una nueva propiedad</p>
+                    <Button 
+                      onClick={() => openPropertyModal('create')} 
+                      disabled={!hasPermission('manage_properties') && !isAdmin()}
+                    >
+                      <Plus size={16} className="mr-2" /> Nueva Propiedad
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Leads Tab */}
+        {activeTab === 'leads' && (
+          <div className="space-y-6 animate-in fade-in duration-500">
+            {/* Filters */}
+            <div className="bg-white p-4 rounded-xl border border-gray-100 flex flex-wrap gap-4 items-center">
+              <div className="relative flex-grow max-w-md">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                <input 
+                  type="text" 
+                  placeholder="Buscar lead..." 
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-1 focus:ring-gold" 
+                />
+              </div>
+              <select 
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-1 focus:ring-gold"
+              >
+                <option value="all">Todos los estados</option>
+                <option value="pending">Pendientes</option>
+                <option value="confirmed">Confirmados</option>
+                <option value="cancelled">Cancelados</option>
+                <option value="completed">Completados</option>
+              </select>
+            </div>
+
+            {/* Lead Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredLeads.map(lead => (
+                <div key={lead.id} className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm flex flex-col">
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="w-12 h-12 bg-navy/5 text-navy rounded-lg flex items-center justify-center font-bold text-xl uppercase">
+                      {lead.client_name.charAt(0)}
+                    </div>
+                    <select 
+                      value={lead.status}
+                      onChange={(e) => handleStatusChange(lead.id, e.target.value as Lead['status'])}
+                      className={`text-[10px] px-3 py-1.5 rounded-full font-bold uppercase outline-none cursor-pointer border-none shadow-sm ${
+                        lead.status === 'pending' ? 'bg-blue-500 text-white' : 
+                        lead.status === 'confirmed' ? 'bg-gold text-white' : 
+                        lead.status === 'cancelled' ? 'bg-red-500 text-white' : 
+                        lead.status === 'completed' ? 'bg-green-600 text-white' : 'bg-gray-400 text-white'
+                      }`}
+                    >
+                      <option value="pending">Pendiente</option>
+                      <option value="confirmed">Confirmado</option>
+                      <option value="cancelled">Cancelado</option>
+                      <option value="completed">Completado</option>
+                    </select>
+                  </div>
+                  <h4 className="font-bold text-navy text-lg">{lead.client_name}</h4>
+                  <p className="text-xs text-gold font-bold mb-4 tracking-wider uppercase">{lead.type}</p>
+                  <p className="text-sm text-gray-600 italic mb-6 leading-relaxed line-clamp-3">"{lead.message}"</p>
+                  
+                  <div className="mt-auto pt-6 border-t border-gray-50 flex flex-col gap-2">
+                    <div className="flex items-center gap-2 text-xs text-gray-500 font-medium">
+                      <Mail size={14} className="text-gray-400" /> {lead.client_email}
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-gray-500 font-medium">
+                      <Phone size={14} className="text-gray-400" /> {lead.client_phone}
+                    </div>
+                    <p className="text-[10px] text-gray-400 font-bold uppercase mt-2">
+                      <Calendar size={12} className="inline mr-1" /> {lead.date}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Users Tab */}
+        {activeTab === 'users' && (
+          <div className="space-y-6 animate-in fade-in duration-500">
+            <div className="bg-white rounded-xl border border-gray-100 p-6">
+              <div className="flex items-center gap-4 mb-6">
+                <Shield className="text-gold" size={32} />
+                <div>
+                  <h3 className="font-bold text-navy text-xl">Sistema de Roles</h3>
+                  <p className="text-gray-500 text-sm">Gestion de usuarios y permisos</p>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {[
+                  { name: 'Super Admin', desc: 'Acceso total al sistema', color: 'bg-red-500' },
+                  { name: 'Admin', desc: 'Gestion completa sin eliminar', color: 'bg-orange-500' },
+                  { name: 'Sales Manager', desc: 'Leads y equipo de ventas', color: 'bg-blue-500' },
+                  { name: 'Agent', desc: 'Leads asignados solamente', color: 'bg-green-500' },
+                  { name: 'Marketing', desc: 'Contenido y campanas', color: 'bg-purple-500' }
+                ].map(role => (
+                  <div key={role.name} className="p-4 bg-gray-50 rounded-lg border border-gray-100">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className={`w-3 h-3 rounded-full ${role.color}`}></div>
+                      <p className="font-bold text-navy">{role.name}</p>
+                    </div>
+                    <p className="text-xs text-gray-500">{role.desc}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-8 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <p className="text-sm text-blue-800">
+                  <strong>Nota:</strong> Para gestionar usuarios, cree cuentas en Supabase Auth y asigne roles en la tabla user_roles.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Settings Tab */}
+        {activeTab === 'settings' && (
+          <div className="space-y-6 animate-in fade-in duration-500">
+            <div className="bg-white rounded-xl border border-gray-100 p-6">
+              <h3 className="font-bold text-navy text-xl mb-6">Configuracion del Sistema</h3>
+              
+              <div className="space-y-4">
+                <div className="p-4 bg-gray-50 rounded-lg">
+                  <p className="font-semibold text-navy mb-1">URL de Supabase</p>
+                  <p className="text-sm text-gray-500 font-mono">{import.meta.env.VITE_SUPABASE_URL}</p>
+                </div>
+                
+                <div className="p-4 bg-gray-50 rounded-lg">
+                  <p className="font-semibold text-navy mb-1">Tipos de Propiedad</p>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {propertyTypes.map(pt => (
+                      <span key={pt.id} className="px-3 py-1 bg-white rounded-full text-xs font-medium text-navy border">
+                        {pt.display_name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="p-4 bg-gray-50 rounded-lg">
+                  <p className="font-semibold text-navy mb-1">Desarrollos Activos</p>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {developments.map(d => (
+                      <span key={d.id} className="px-3 py-1 bg-white rounded-full text-xs font-medium text-navy border">
+                        {d.name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="p-4 bg-gray-50 rounded-lg">
+                  <p className="font-semibold text-navy mb-1">Fuentes de Leads</p>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {leadSources.map(ls => (
+                      <span key={ls.id} className="px-3 py-1 bg-white rounded-full text-xs font-medium text-navy border">
+                        {ls.display_name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+      </main>
+
+      {/* Property Modal */}
+      <PropertyModal
+        isOpen={showPropertyModal}
+        onClose={closePropertyModal}
+        property={editingProperty}
+        mode={modalMode}
+        onSave={handlePropertySave}
+        onUpdate={handlePropertyUpdate}
+        onDelete={handleDeleteProperty}
+      />
+    </div>
+  );
+};
+
+export default AdminDashboard;
