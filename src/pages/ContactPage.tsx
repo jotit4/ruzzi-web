@@ -23,6 +23,8 @@ const ContactPage = () => {
     try {
       // 1. Create Lead in CRM
       await createLead({
+        name: formData.name,
+        email: formData.email,
         client_name: formData.name,
         client_email: formData.email,
         client_phone: formData.phone,
