@@ -3,6 +3,7 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 # Enable pnpm
+ENV CI=true
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
 # Copy package management files
@@ -15,8 +16,8 @@ RUN pnpm install --frozen-lockfile
 COPY . .
 
 # Build the application
-# We use build:prod as defined in package.json
-RUN pnpm run build:prod
+# We use direct commands to avoid the redundant 'pnpm install' in the build:prod script
+RUN rm -rf node_modules/.vite-temp && pnpm tsc -b && BUILD_MODE=prod pnpm vite build
 
 # Production stage
 FROM nginx:alpine
