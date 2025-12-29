@@ -179,12 +179,16 @@ const Footer = () => {
   return (
     <footer className="bg-navy text-white pt-20 pb-10 border-t-2 border-gold">
       <div className="container mx-auto px-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-16">
-          <div className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-12 mb-16">
+          <div className="space-y-6 lg:col-span-2">
             <div className="mb-6">
-              <Logo className="h-14 w-auto" />
+              <img
+                src="/footer-logo.png"
+                alt="Ruzzi Footer Logo"
+                className="h-40 w-auto object-contain"
+              />
             </div>
-            <p className="text-white text-sm leading-relaxed font-light">
+            <p className="text-white text-sm leading-relaxed font-light max-w-md">
               Transformamos visiones en realidades habitables. Líderes en desarrollo inmobiliario premium y urbanización inteligente en Córdoba.
             </p>
           </div>
