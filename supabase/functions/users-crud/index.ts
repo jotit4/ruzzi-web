@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -27,14 +26,15 @@ serve(async (req) => {
 
         const body = await req.json().catch(() => ({}))
         const { action, data } = body
-        console.log(`[USERS CRUD v7] Action: ${action}`);
+        console.log(`[USERS CRUD v8] Action: ${action}`);
 
         if (action === 'delete') {
-            const { userId } = data;
-            if (!userId) throw new Error('User ID is required for deletion');
+            const { userId, id } = data;
+            const targetId = userId || id;
+            if (!targetId) throw new Error('User ID is required for deletion');
 
-            console.log(`[USERS CRUD] Deleting user ${userId}...`);
-            const { error: deleteError } = await supabase.auth.admin.deleteUser(userId);
+            console.log(`[USERS CRUD] Deleting user ${targetId}...`);
+            const { error: deleteError } = await supabase.auth.admin.deleteUser(targetId);
 
             if (deleteError) {
                 console.error('[USERS CRUD] Delete error:', deleteError);
@@ -42,6 +42,68 @@ serve(async (req) => {
             }
 
             return new Response(JSON.stringify({ message: 'User deleted successfully' }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                status: 200,
+            });
+        }
+
+        if (action === 'update') {
+            const { id, userId, email, password, full_name, role, role_id, phone, position, department, is_active } = data
+            const targetUserId = userId || id;
+
+            if (!targetUserId) throw new Error('User ID is required for update');
+
+            console.log(`[USERS CRUD] Updating user ${targetUserId}...`);
+
+            // 1. Update Auth (Email, Password, Metadata)
+            const authUpdates: any = {};
+            if (email) authUpdates.email = email;
+            if (password) authUpdates.password = password;
+            if (full_name) authUpdates.user_metadata = { full_name };
+
+            if (Object.keys(authUpdates).length > 0) {
+                const { error: authError } = await supabase.auth.admin.updateUserById(targetUserId, authUpdates);
+                if (authError) throw authError;
+            }
+
+            // 2. Update Profile
+            // Construct profile updates object, only including defined values
+            const profileUpdates: any = {};
+            if (phone !== undefined) profileUpdates.phone = phone;
+            if (position !== undefined) profileUpdates.position = position;
+            if (department !== undefined) profileUpdates.department = department;
+            if (is_active !== undefined) profileUpdates.is_active = is_active;
+            if (full_name !== undefined) profileUpdates.full_name = full_name; // Sync full name to profile too
+
+            if (Object.keys(profileUpdates).length > 0) {
+                const { error: profileError } = await supabase
+                    .from('profiles')
+                    .update(profileUpdates)
+                    .eq('id', targetUserId);
+
+                if (profileError) throw profileError;
+            }
+
+            // 3. Update Role if provided
+            let newRoleId = role_id;
+            if (!newRoleId && role && ROLE_MAP[role]) {
+                newRoleId = ROLE_MAP[role];
+            }
+
+            if (newRoleId) {
+                // Check if role is actually different? Or just force update.
+                // Delete existing roles
+                await supabase.from('user_roles').delete().eq('user_id', targetUserId);
+
+                const { error: roleError } = await supabase.from('user_roles').insert([{
+                    user_id: targetUserId,
+                    role_id: newRoleId,
+                    assigned_at: new Date().toISOString()
+                }]);
+                if (roleError) console.error('Role update error:', roleError);
+            }
+
+            return new Response(JSON.stringify({ message: 'User updated successfully' }), {
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },
                 status: 200,
             });
@@ -76,7 +138,7 @@ serve(async (req) => {
         }
 
         if (action === 'create') {
-            const { email, password, full_name, role_id, phone, position, department } = data
+            const { email, password, full_name, role_id, role, phone, position, department } = data
 
             console.log(`[USERS CRUD] Creating user ${email}...`);
 
@@ -91,22 +153,20 @@ serve(async (req) => {
             if (authError) throw authError
             if (!authUser.user) throw new Error('User creation failed without error')
 
-            // 2. Assign Role (using role_id passed from frontend or mapping)
-            // The frontend seems to pass a UUID role_id directly now, or a role name KEY?
-            // If it passes a UUID (role_id), we use it. If it passes a role NAME (role), we map it.
+            // 2. Assign Role
             let roleId = role_id;
-            if (!roleId && data.role) {
-                roleId = ROLE_MAP[data.role] || ROLE_MAP['agent'];
+            if (!roleId && role) {
+                roleId = ROLE_MAP[role] || ROLE_MAP['agent'];
             }
 
             if (!roleId) throw new Error('Role ID is required');
 
-            // 3. Update Profile (trigger should have created it, but we update details)
-            // Wait a bit for trigger? Or just try to update immediately
+            // 3. Update Profile
             console.log(`[USERS CRUD] Updating profile for ${authUser.user.id}...`);
             const { data: profile, error: profileError } = await supabase
                 .from('profiles')
                 .update({
+                    full_name, // Ensure full_name is in profile
                     phone,
                     position,
                     department,
@@ -117,9 +177,9 @@ serve(async (req) => {
                 .single()
 
             if (profileError) {
-                console.error('[USERS CRUD] Profile update error (trigger might not have finished?):', profileError);
-                // If update failed, maybe trigger didn't run? Let's try to UPSERT as fallback
-                const { data: upsertData, error: upsertError } = await supabase
+                console.error('[USERS CRUD] Profile update error:', profileError);
+                // Fallback upsert
+                const { error: upsertError } = await supabase
                     .from('profiles')
                     .upsert({
                         id: authUser.user.id,
@@ -130,8 +190,6 @@ serve(async (req) => {
                         department,
                         is_active: true
                     })
-                    .select()
-                    .single()
 
                 if (upsertError) throw upsertError;
             }
@@ -167,206 +225,4 @@ serve(async (req) => {
             status: 400,
         })
     }
-});
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-
-const corsHeaders = {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
-
-serve(async (req) => {
-    if (req.method === "OPTIONS") {
-        return new Response("ok", { headers: corsHeaders });
-    }
-
-    try {
-        const supabaseClient = createClient(
-            Deno.env.get("SUPABASE_URL") ?? "",
-            Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-            {
-                auth: {
-                    autoRefreshToken: false,
-                    persistSession: false,
-                },
-            }
-        );
-
-        // Get currentUser to verify they are admin
-        const authHeader = req.headers.get('Authorization');
-        if (!authHeader) {
-            throw new Error('No authorization header');
-        }
-
-        const { data: { user: currentUser }, error: authError } = await supabaseClient.auth.getUser(
-            authHeader.replace('Bearer ', '')
-        );
-
-        if (authError || !currentUser) {
-            // If regular auth fails (maybe because verifying against service role client isn't straightforward for session tokens without anon key context),
-            // we might need to rely on the passed token validation.
-            // However, usually service role can verify any token? No, getUser works with the token passed.
-            // Let's assume the caller passes a valid JWT.
-            // throw new Error('Unauthorized');
-        }
-
-        // Ideally check if currentUser has 'admin' role in profiles or app_metadata
-        // For now assuming the frontend protects the route and we trust the token (and RLS would block if we weren't using Service Role)
-        // BUT we ARE using Service Role, so we MUST verify role manually.
-
-        // Check requester role
-        const { data: requesterProfile } = await supabaseClient
-            .from('profiles')
-            .select('role')
-            .eq('id', currentUser?.id)
-            .single();
-
-        // Allow if role is admin or superadmin, or if we are skipping check for dev (DANGEROUS). 
-        // Let's enforce it:
-        /*
-        if (requesterProfile?.role !== 'admin' && requesterProfile?.role !== 'SuperAdmin') {
-           throw new Error('Forbidden: Insufficient permissions');
-        }
-        */
-
-        const { action, data } = await req.json();
-
-        if (action === "list") {
-            // Fetch both auth users and profiles and merge them
-            const { data: { users }, error: usersError } = await supabaseClient.auth.admin.listUsers();
-            if (usersError) throw usersError;
-
-            const { data: profiles, error: profilesError } = await supabaseClient
-                .from('profiles')
-                .select('*');
-            if (profilesError) throw profilesError;
-
-            // Merge data
-            const mergedUsers = users.map(user => {
-                const profile = profiles.find(p => p.id === user.id);
-                return {
-                    id: user.id,
-                    email: user.email,
-                    created_at: user.created_at,
-                    last_sign_in_at: user.last_sign_in_at,
-                    full_name: profile?.full_name || user.user_metadata?.full_name || 'N/A',
-                    role: profile?.role || 'user', // Default to user if not found
-                    is_active: profile?.is_active ?? true, // Default to true
-                    phone: profile?.phone,
-                    avatar_url: profile?.avatar_url,
-                    position: profile?.position,
-                    department: profile?.department
-                };
-            });
-
-            return new Response(JSON.stringify(mergedUsers), {
-                headers: { ...corsHeaders, "Content-Type": "application/json" },
-                status: 200,
-            });
-        }
-
-        if (action === "create") {
-            const { email, password, full_name, role, position, department, phone } = data;
-
-            // 1. Create User in Auth
-            const { data: newUser, error: createError } = await supabaseClient.auth.admin.createUser({
-                email,
-                password,
-                email_confirm: true, // Auto confirm
-                user_metadata: { full_name }
-            });
-
-            if (createError) throw createError;
-
-            if (!newUser.user) throw new Error("User creation failed");
-
-            // 2. Create/Update Profile
-            const { error: profileError } = await supabaseClient
-                .from('profiles')
-                .upsert({
-                    id: newUser.user.id,
-                    full_name,
-                    role: role || 'agent',
-                    email, // Redundant but harmless if in schema
-                    position,
-                    department,
-                    phone,
-                    is_active: true
-                });
-
-            if (profileError) {
-                // Rollback? Deleting user if profile fails is good practice
-                await supabaseClient.auth.admin.deleteUser(newUser.user.id);
-                throw profileError;
-            }
-
-            return new Response(JSON.stringify(newUser.user), {
-                headers: { ...corsHeaders, "Content-Type": "application/json" },
-                status: 200,
-            });
-        }
-
-        if (action === "update") {
-            const { id, full_name, role, position, department, phone, password, is_active } = data;
-
-            // 1. Update Auth (Password if provided)
-            if (password) {
-                const { error: updateAuthError } = await supabaseClient.auth.admin.updateUserById(
-                    id,
-                    { password }
-                );
-                if (updateAuthError) throw updateAuthError;
-            }
-
-            // 2. Update Profile
-            const { data: updatedProfile, error: updateProfileError } = await supabaseClient
-                .from('profiles')
-                .update({
-                    full_name,
-                    role,
-                    position,
-                    department,
-                    phone,
-                    is_active
-                })
-                .eq('id', id)
-                .select()
-                .single();
-
-            if (updateProfileError) throw updateProfileError;
-
-            return new Response(JSON.stringify(updatedProfile), {
-                headers: { ...corsHeaders, "Content-Type": "application/json" },
-                status: 200,
-            });
-        }
-
-        if (action === "delete") {
-            const { id } = data;
-
-            // Delete from Auth (Triggers commonly handle profile cascade, but we can do explicit if needed)
-            // Usually better to 'soft delete' (is_active = false) but request probably implies hard delete
-            const { error: deleteError } = await supabaseClient.auth.admin.deleteUser(id);
-            if (deleteError) throw deleteError;
-
-            // Check if profile is gone or needs manual cleanup
-            // Assuming ON DELETE CASCADE in Postgres, but let's be safe:
-            /*
-            await supabaseClient.from('profiles').delete().eq('id', id);
-            */
-
-            return new Response(JSON.stringify({ success: true }), {
-                headers: { ...corsHeaders, "Content-Type": "application/json" },
-                status: 200,
-            });
-        }
-
-        throw new Error(`Unknown action: ${action}`);
-
-    } catch (error) {
-        return new Response(JSON.stringify({ error: error.message }), {
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-            status: 400,
-        });
-    }
-});
+})
