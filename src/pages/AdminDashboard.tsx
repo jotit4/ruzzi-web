@@ -1104,7 +1104,7 @@ const AdminDashboard = () => {
                     type="text"
                     value={localWebConfig.about?.hero?.title || 'GRUPO RUZZI'}
                     onChange={(e) => {
-                      const currentAbout = localWebConfig.about || {};
+                      const currentAbout = localWebConfig.about || ({} as any);
                       const currentHero = currentAbout.hero || { title: '', description1: '', description2: '' };
                       handleFieldChange('about', 'hero', { ...currentHero, title: e.target.value });
                     }}
@@ -1116,7 +1116,7 @@ const AdminDashboard = () => {
                   <textarea
                     value={localWebConfig.about?.hero?.description1 || ''}
                     onChange={(e) => {
-                      const currentAbout = localWebConfig.about || {};
+                      const currentAbout = localWebConfig.about || ({} as any);
                       const currentHero = currentAbout.hero || { title: '', description1: '', description2: '' };
                       handleFieldChange('about', 'hero', { ...currentHero, description1: e.target.value });
                     }}
@@ -1128,7 +1128,7 @@ const AdminDashboard = () => {
                   <textarea
                     value={localWebConfig.about?.hero?.description2 || ''}
                     onChange={(e) => {
-                      const currentAbout = localWebConfig.about || {};
+                      const currentAbout = localWebConfig.about || ({} as any);
                       const currentHero = currentAbout.hero || { title: '', description1: '', description2: '' };
                       handleFieldChange('about', 'hero', { ...currentHero, description2: e.target.value });
                     }}
@@ -1151,7 +1151,7 @@ const AdminDashboard = () => {
                     type="text"
                     value={localWebConfig.about?.whatWeDo?.title || 'QUÉ HACEMOS'}
                     onChange={(e) => {
-                      const currentAbout = localWebConfig.about || {};
+                      const currentAbout = localWebConfig.about || ({} as any);
                       const currentSection = currentAbout.whatWeDo || { title: '', description1: '', description2: '', image: '', quote: '' };
                       handleFieldChange('about', 'whatWeDo', { ...currentSection, title: e.target.value });
                     }}
@@ -1164,7 +1164,7 @@ const AdminDashboard = () => {
                     type="text"
                     value={localWebConfig.about?.whatWeDo?.image || ''}
                     onChange={(e) => {
-                      const currentAbout = localWebConfig.about || {};
+                      const currentAbout = localWebConfig.about || ({} as any);
                       const currentSection = currentAbout.whatWeDo || { title: '', description1: '', description2: '', image: '', quote: '' };
                       handleFieldChange('about', 'whatWeDo', { ...currentSection, image: e.target.value });
                     }}
@@ -1176,7 +1176,7 @@ const AdminDashboard = () => {
                   <textarea
                     value={localWebConfig.about?.whatWeDo?.description1 || ''}
                     onChange={(e) => {
-                      const currentAbout = localWebConfig.about || {};
+                      const currentAbout = localWebConfig.about || ({} as any);
                       const currentSection = currentAbout.whatWeDo || { title: '', description1: '', description2: '', image: '', quote: '' };
                       handleFieldChange('about', 'whatWeDo', { ...currentSection, description1: e.target.value });
                     }}
@@ -1188,7 +1188,7 @@ const AdminDashboard = () => {
                   <textarea
                     value={localWebConfig.about?.whatWeDo?.description2 || ''}
                     onChange={(e) => {
-                      const currentAbout = localWebConfig.about || {};
+                      const currentAbout = localWebConfig.about || ({} as any);
                       const currentSection = currentAbout.whatWeDo || { title: '', description1: '', description2: '', image: '', quote: '' };
                       handleFieldChange('about', 'whatWeDo', { ...currentSection, description2: e.target.value });
                     }}
@@ -1201,7 +1201,7 @@ const AdminDashboard = () => {
                     type="text"
                     value={localWebConfig.about?.whatWeDo?.quote || ''}
                     onChange={(e) => {
-                      const currentAbout = localWebConfig.about || {};
+                      const currentAbout = localWebConfig.about || ({} as any);
                       const currentSection = currentAbout.whatWeDo || { title: '', description1: '', description2: '', image: '', quote: '' };
                       handleFieldChange('about', 'whatWeDo', { ...currentSection, quote: e.target.value });
                     }}
@@ -1225,7 +1225,7 @@ const AdminDashboard = () => {
                       type="text"
                       value={localWebConfig.about?.commitment?.subtitle || 'Nuestra Promesa'}
                       onChange={(e) => {
-                        const currentAbout = localWebConfig.about || {};
+                        const currentAbout = localWebConfig.about || ({} as any);
                         const currentSection = currentAbout.commitment || { title: '', subtitle: '', description: '', quote: '' };
                         handleFieldChange('about', 'commitment', { ...currentSection, subtitle: e.target.value });
                       }}
@@ -1238,7 +1238,7 @@ const AdminDashboard = () => {
                       type="text"
                       value={localWebConfig.about?.commitment?.title || 'NUESTRO COMPROMISO'}
                       onChange={(e) => {
-                        const currentAbout = localWebConfig.about || {};
+                        const currentAbout = localWebConfig.about || ({} as any);
                         const currentSection = currentAbout.commitment || { title: '', subtitle: '', description: '', quote: '' };
                         handleFieldChange('about', 'commitment', { ...currentSection, title: e.target.value });
                       }}
@@ -1251,7 +1251,7 @@ const AdminDashboard = () => {
                   <textarea
                     value={localWebConfig.about?.commitment?.description || ''}
                     onChange={(e) => {
-                      const currentAbout = localWebConfig.about || {};
+                      const currentAbout = localWebConfig.about || ({} as any);
                       const currentSection = currentAbout.commitment || { title: '', subtitle: '', description: '', quote: '' };
                       handleFieldChange('about', 'commitment', { ...currentSection, description: e.target.value });
                     }}
@@ -1264,7 +1264,7 @@ const AdminDashboard = () => {
                     type="text"
                     value={localWebConfig.about?.commitment?.quote || ''}
                     onChange={(e) => {
-                      const currentAbout = localWebConfig.about || {};
+                      const currentAbout = localWebConfig.about || ({} as any);
                       const currentSection = currentAbout.commitment || { title: '', subtitle: '', description: '', quote: '' };
                       handleFieldChange('about', 'commitment', { ...currentSection, quote: e.target.value });
                     }}
@@ -1288,7 +1288,7 @@ const AdminDashboard = () => {
                       type="text"
                       value={localWebConfig.about?.values?.title || 'Nuestros Valores'}
                       onChange={(e) => {
-                        const currentAbout = localWebConfig.about || {};
+                        const currentAbout = localWebConfig.about || ({} as any);
                         const currentValues = currentAbout.values || { title: '', subtitle: '', items: [] };
                         handleFieldChange('about', 'values', { ...currentValues, title: e.target.value });
                       }}
@@ -1301,7 +1301,7 @@ const AdminDashboard = () => {
                       type="text"
                       value={localWebConfig.about?.values?.subtitle || ''}
                       onChange={(e) => {
-                        const currentAbout = localWebConfig.about || {};
+                        const currentAbout = localWebConfig.about || ({} as any);
                         const currentValues = currentAbout.values || { title: '', subtitle: '', items: [] };
                         handleFieldChange('about', 'values', { ...currentValues, subtitle: e.target.value });
                       }}
@@ -1320,7 +1320,7 @@ const AdminDashboard = () => {
                         placeholder="Título del Valor"
                         value={localWebConfig.about?.values?.items?.[idx]?.title || ''}
                         onChange={(e) => {
-                          const currentAbout = localWebConfig.about || {};
+                          const currentAbout = localWebConfig.about || ({} as any);
                           const currentValues = currentAbout.values || { title: '', subtitle: '', items: [] };
                           const newItems = [...(currentValues.items || [])];
                           if (!newItems[idx]) newItems[idx] = { title: '', description: '' };
@@ -1333,7 +1333,7 @@ const AdminDashboard = () => {
                         placeholder="Descripción del Valor"
                         value={localWebConfig.about?.values?.items?.[idx]?.description || ''}
                         onChange={(e) => {
-                          const currentAbout = localWebConfig.about || {};
+                          const currentAbout = localWebConfig.about || ({} as any);
                           const currentValues = currentAbout.values || { title: '', subtitle: '', items: [] };
                           const newItems = [...(currentValues.items || [])];
                           if (!newItems[idx]) newItems[idx] = { title: '', description: '' };

@@ -41,8 +41,9 @@ const ScrollContactForm: React.FC<ScrollContactFormProps> = ({ propertyId, prope
 
         try {
             await createLead({
+                name: formData.name || 'Cliente Web',
+                email: 'no-email@web-scroll.com', // Placeholder as not collected
                 client_name: formData.name || 'Cliente Web',
-                client_email: '', // Optional in this mini form
                 client_phone: formData.phone,
                 property_id: propertyId,
                 booking_date: new Date().toISOString(),
