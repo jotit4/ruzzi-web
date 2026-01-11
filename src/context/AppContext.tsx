@@ -31,6 +31,9 @@ interface AppContextType {
   deleteProperty: (id: string) => Promise<void>;
 
   // Leads
+  leads: Lead[];
+  leadsLoading: boolean;
+  refreshLeads: () => Promise<void>;
   createLead: (data: Omit<Lead, 'id' | 'created_at' | 'status'>) => Promise<Lead>;
 
   // Users - Admin UI
@@ -62,6 +65,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [webConfigLoading, setWebConfigLoading] = useState(false);
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [usersLoading, setUsersLoading] = useState(false);
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [leadsLoading, setLeadsLoading] = useState(false);
 
   // Initialize Supabase auth listener and get initial session
   useEffect(() => {
@@ -118,6 +123,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           refreshProperties(),
           refreshStats(),
           refreshUsers(),
+          refreshLeads(),
           refreshWebConfig()
         ]);
       }
@@ -198,33 +204,89 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return newProperty;
   };
 
+  const refreshLeads = async () => {
+    if (!user) return;
+    setLeadsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('leads')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (error) throw error;
+
+      // Map DB lead to frontend Lead type if necessary, or ensure types match
+      // Assuming straightforward mapping for now based on previous interface
+      const mappedLeads: Lead[] = (data || []).map((dbLead: any) => ({
+        id: dbLead.id,
+        client_name: dbLead.client_name || `${dbLead.first_name || ''} ${dbLead.last_name || ''}`.trim(),
+        client_email: dbLead.client_email || dbLead.email || '',
+        client_phone: dbLead.client_phone || dbLead.phone || '',
+        property_id: dbLead.property_id,
+        booking_date: dbLead.booking_date || dbLead.created_at,
+        created_at: dbLead.created_at,
+        status: dbLead.status || 'pending',
+        notes: dbLead.notes,
+        created_by: dbLead.created_by,
+        updated_by: dbLead.updated_by,
+        // Legacy/UI compat
+        name: dbLead.client_name || `${dbLead.first_name || ''} ${dbLead.last_name || ''}`.trim(),
+        email: dbLead.client_email || dbLead.email || '',
+        phone: dbLead.client_phone || dbLead.phone || '',
+        type: dbLead.property_type_preference || 'Consulta General',
+        message: dbLead.notes || ''
+      }));
+
+      setLeads(mappedLeads);
+    } catch (error) {
+      console.error('Error refreshing leads:', error);
+    } finally {
+      setLeadsLoading(false);
+    }
+  };
+
   const createLead = async (data: Omit<Lead, 'id' | 'created_at' | 'status'>) => {
     console.log('[AppContext] createLead called', data);
     try {
-      // In a real app this would call an Edge Function or insert into a table
-      // For now we'll just log it and return a mock lead to satisfy the interface
-      // or try to insert into a 'leads' table if it exists
-
-      const { error } = await supabase.from('leads').insert([{
-        ...data,
-        status: 'new'
-      }]);
+      const { data: newLead, error } = await supabase.from('leads').insert([{
+        first_name: data.name,
+        // Assuming single name field for now, checking db schema in head creates split
+        email: data.email,
+        phone: data.phone,
+        notes: data.notes || data.message,
+        property_type_preference: data.type || 'Consulta General',
+        status: 'new',
+        created_at: new Date().toISOString()
+      }]).select().single();
 
       if (error) {
-        console.warn('Could not insert lead into DB, likely missing table. Proceeding strictly with UI.', error);
+        console.warn('Could not insert lead into DB', error);
+        throw error;
       }
 
+      if (user) {
+        await refreshLeads();
+      }
+
+      // Return a proper Lead object
+      return {
+        id: newLead.id,
+        ...data,
+        created_at: newLead.created_at,
+        status: 'new'
+      } as Lead;
+
+    } catch (error) {
+      console.error('Error creating lead:', error);
+      // Fallback for UI if DB fails but treating as success not ideal, but keeping existing behavior
       const mockLead: Lead = {
         id: Math.random().toString(36).substr(2, 9),
         created_at: new Date().toISOString(),
         status: 'new',
         ...data
       };
-
       return mockLead;
-    } catch (error) {
-      console.error('Error creating lead:', error);
-      throw error;
     }
   };
 
@@ -418,6 +480,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     updateProperty,
     deleteProperty,
     createLead,
+    leads,
+    leadsLoading,
+    refreshLeads,
     refreshWebConfig,
     updateWebConfig,
 

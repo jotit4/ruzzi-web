@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import {
   ArrowLeft, ArrowRight, Upload, X, Layout, Globe, Star, Eye, Monitor, Columns,
   Building, Filter, Plus, Edit2, Trash2, CheckCircle, Clock, Construction,
-  LogOut, BarChart3, Users, Grid, Type
+  LogOut, BarChart3, Users, Grid, Type, Shield, Instagram, Facebook, Linkedin, Phone
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { supabase } from '../lib/supabase';
@@ -39,6 +40,8 @@ const AdminDashboard = () => {
     webConfig,
     webConfigLoading,
     updateWebConfig,
+    leads,
+    leadsLoading,
     logout
   } = useApp();
 
@@ -56,6 +59,7 @@ const AdminDashboard = () => {
 
   const [isSplitView, setIsSplitView] = useState(false);
   const [previewProperty, setPreviewProperty] = useState<Partial<Property>>({});
+  const [pendingImages, setPendingImages] = useState<File[]>([]);
 
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState<{
@@ -156,9 +160,9 @@ const AdminDashboard = () => {
     if (confirm(`¿Estás seguro de eliminar "${property.title}"?`)) {
       try {
         await deleteProperty(property.id);
-        alert('Propiedad eliminada exitosamente');
+        toast.success('Propiedad eliminada exitosamente');
       } catch (error) {
-        alert(`Error al eliminar propiedad: ${error.message}`);
+        toast.error(`Error al eliminar propiedad: ${error.message}`);
       }
     }
   };
@@ -169,27 +173,82 @@ const AdminDashboard = () => {
     setEditFeatures([]);
     setIsSplitView(false);
     setPreviewProperty({});
+    setPendingImages([]);
   };
 
   const handleSaveProperty = async (propertyData: Omit<Property, 'id'>) => {
     console.log('[AdminDashboard] handleSaveProperty called', { modalMode, propertyData });
     try {
       if (modalMode === 'create') {
-        await createProperty(propertyData);
-        alert('Propiedad creada exitosamente');
+        const newProperty = await createProperty(propertyData);
+        console.log('🚀 [AdminDashboard] New property created:', newProperty);
+
+        // Upload pending images if any
+        if (newProperty && pendingImages.length > 0) {
+          try {
+            const { data: { session } } = await supabase.auth.getSession();
+            for (let i = 0; i < pendingImages.length; i++) {
+              const file = pendingImages[i];
+              const fileExt = file.name.split('.').pop();
+              const fileName = `${newProperty.id}/${Math.random().toString(36).substring(2)}.${fileExt}`;
+              const filePath = `${fileName}`;
+
+              const { error: uploadError } = await supabase.storage
+                .from('property-images')
+                .upload(filePath, file);
+
+              if (uploadError) throw uploadError;
+
+              const { data: { publicUrl } } = supabase.storage
+                .from('property-images')
+                .getPublicUrl(filePath);
+
+              await supabase.functions.invoke('properties-crud', {
+                body: {
+                  action: 'add-image',
+                  data: {
+                    property_id: newProperty.id,
+                    image_url: publicUrl,
+                    is_primary: i === 0,
+                    display_order: i
+                  }
+                },
+                headers: { Authorization: `Bearer ${session?.access_token}` }
+              });
+            }
+          } catch (imgError) {
+            console.error('Error uploading initial images:', imgError);
+            toast.error('Propiedad creada, pero hubo un error al subir algunas imágenes');
+          }
+        }
+
+        if (pendingImages.length > 0) {
+          await refreshProperties();
+        }
+
+        toast.success('Propiedad creada exitosamente');
       } else if (modalMode === 'edit' && selectedProperty) {
         await updateProperty(selectedProperty.id, propertyData);
-        alert('Propiedad actualizada exitosamente');
+        toast.success('Propiedad actualizada exitosamente');
       }
       handleClosePropertyModal();
     } catch (error) {
-      alert(`Error: ${error.message}`);
+      toast.error(`Error: ${error.message}`);
     }
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (!files || !selectedProperty || !user) return;
+    if (!files) return;
+
+    if (modalMode === 'create') {
+      setPendingImages(prev => [...prev, ...Array.from(files)]);
+      // Reset input
+      e.target.value = '';
+      return;
+    }
+
+    if (!selectedProperty || !user) return;
 
     setImagesLoading(true);
     try {
@@ -235,13 +294,19 @@ const AdminDashboard = () => {
       if (updatedProperty) setSelectedProperty(updatedProperty);
       refreshProperties();
     } catch (error) {
-      alert(`Error al subir imágenes: ${error.message}`);
+      toast.error(`Error al subir imágenes: ${error.message}`);
     } finally {
       setImagesLoading(false);
     }
   };
 
   const handleDeleteImage = async (imageId: string) => {
+    if (imageId.startsWith('pending-')) {
+      const index = parseInt(imageId.split('-')[1]);
+      setPendingImages(prev => prev.filter((_, i) => i !== index));
+      return;
+    }
+
     if (!selectedProperty || !confirm('¿Estás seguro de eliminar esta imagen?')) return;
 
     setImagesLoading(true);
@@ -262,7 +327,7 @@ const AdminDashboard = () => {
       if (updatedProperty) setSelectedProperty(updatedProperty);
       refreshProperties();
     } catch (error) {
-      alert(`Error al eliminar imagen: ${error.message}`);
+      toast.error(`Error al eliminar imagen: ${error.message}`);
     } finally {
       setImagesLoading(false);
     }
@@ -304,7 +369,7 @@ const AdminDashboard = () => {
       });
       refreshProperties();
     } catch (error) {
-      alert(`Error al reordenar imágenes: ${error.message}`);
+      toast.error(`Error al reordenar imágenes: ${error.message}`);
     } finally {
       setImagesLoading(false);
     }
@@ -344,7 +409,7 @@ const AdminDashboard = () => {
       });
       refreshProperties();
     } catch (error) {
-      alert(`Error al establecer imagen principal: ${error.message}`);
+      toast.error(`Error al establecer imagen principal: ${error.message}`);
     } finally {
       setImagesLoading(false);
     }
@@ -354,15 +419,15 @@ const AdminDashboard = () => {
     try {
       if (editingUser) {
         await updateUser(editingUser.id, userData);
-        alert('Usuario actualizado exitosamente');
+        toast.success('Usuario actualizado exitosamente');
       } else {
         await createUser(userData);
-        alert('Usuario creado exitosamente');
+        toast.success('Usuario creado exitosamente');
       }
       setShowUserModal(false);
       setEditingUser(null);
     } catch (error) {
-      alert(`Error: ${error.message}`);
+      toast.error(`Error: ${error.message}`);
     }
   };
 
@@ -389,7 +454,7 @@ const AdminDashboard = () => {
       !property.description?.toLowerCase().includes(filters.search.toLowerCase())) {
       return false;
     }
-    if (filters.status && property.status !== filters.status) {
+    if (filters.status && filters.status !== 'all' && property.status !== filters.status) {
       return false;
     }
     if (filters.priceMin && property.price < filters.priceMin) {
@@ -470,10 +535,78 @@ const AdminDashboard = () => {
         </div>
       </div>
 
-      <div className="bg-white p-6 rounded-lg shadow">
-        <h3 className="text-lg font-bold mb-4">Actividad Reciente</h3>
-        <p className="text-gray-500 italic">No hay actividad reciente para mostrar</p>
+      {/* Recent Leads Widget */}
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+          <h3 className="text-lg font-bold">Consultas Recientes</h3>
+        </div>
+
+        {leadsLoading ? (
+          <div className="p-8 text-center text-gray-400">Cargando consultas...</div>
+        ) : leads.length === 0 ? (
+          <div className="p-8 text-center text-gray-400 italic">No hay consultas recientes</div>
+        ) : (
+          <div className="divide-y divide-gray-100">
+            {leads.slice(0, 5).map((lead) => (
+              <div key={lead.id} className="p-4 hover:bg-gray-50 transition-colors flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+                <div className="flex items-start gap-3 flex-1 min-w-0">
+                  <div className={`mt-1 p-2 rounded-full flex-shrink-0 ${lead.status === 'new' ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-500'
+                    }`}>
+                    <Mail size={16} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h4 className="font-semibold text-gray-900 truncate">{lead.name || lead.client_name}</h4>
+                      <span className="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded uppercase tracking-wide">
+                        {lead.type || 'Consulta'}
+                      </span>
+                      {lead.status === 'new' && (
+                        <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                      )}
+                    </div>
+                    <p className="text-sm text-gray-600 line-clamp-1">{lead.message || lead.notes || 'Sin mensaje'}</p>
+                    <div className="flex items-center gap-3 mt-1 text-xs text-gray-400">
+                      <span>{new Date(lead.created_at).toLocaleDateString()}</span>
+                      <span>•</span>
+                      <span>{lead.email || lead.client_email}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 self-end sm:self-center flex-shrink-0">
+                  {lead.phone && (
+                    <a
+                      href={`https://wa.me/${lead.phone.replace(/[^0-9]/g, '')}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                      title="Contactar por WhatsApp"
+                    >
+                      <img src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg" alt="WA" className="w-4 h-4" />
+                    </a>
+                  )}
+                  <a
+                    href={`mailto:${lead.email || lead.client_email}`}
+                    className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                    title="Enviar Correo"
+                  >
+                    <Mail size={18} />
+                  </a>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {leads.length > 0 && (
+          <div className="bg-gray-50 p-3 text-center border-t border-gray-100">
+            <button className="text-sm text-blue-600 font-medium hover:text-blue-700">
+              Ver todas las consultas ({leads.length})
+            </button>
+          </div>
+        )}
       </div>
+
     </div>
   );
 
@@ -661,10 +794,10 @@ const AdminDashboard = () => {
     const handleSave = async () => {
       try {
         await updateWebConfig(localWebConfig);
-        alert("¡Configuración guardada y publicada con éxito!");
+        toast.success("¡Configuración guardada y publicada con éxito!");
       } catch (error) {
         console.error("Error saving config:", error);
-        alert("Error al guardar la configuración");
+        toast.error("Error al guardar la configuración");
       }
     };
 
@@ -741,84 +874,172 @@ const AdminDashboard = () => {
           </div>
 
           {/* Other Configs could go here */}
-          <div className="space-y-8">
-            <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 space-y-6 opacity-60">
-              <div className="flex items-center gap-3 border-b border-gray-50 pb-4">
-                <div className="p-2 bg-blue-50 rounded-lg">
-                  <Globe className="text-blue-500" size={24} />
-                </div>
-                <h3 className="text-xl font-bold text-navy">SEO y Redes Sociales</h3>
+          {/* SEO & Social Media Editor */}
+          <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 space-y-6">
+            <div className="flex items-center gap-3 border-b border-gray-50 pb-4">
+              <div className="p-2 bg-blue-50 rounded-lg">
+                <Globe className="text-blue-500" size={24} />
               </div>
-              <p className="text-xs text-gray-400 italic">Módulo bajo mantenimiento preventivo para asegurar estabilidad de entrega.</p>
+              <h3 className="text-xl font-bold text-navy">Redes Sociales y Contacto Público</h3>
             </div>
 
-            <div className="bg-[#1B2B3A] p-8 rounded-2xl shadow-xl text-white">
-              <h4 className="font-serif text-xl mb-4 text-gold italic">Tips de Diseño</h4>
-              <ul className="space-y-3 text-sm text-gray-300">
-                <li className="flex items-start gap-2">
-                  <CheckCircle size={16} className="text-gold mt-1 flex-shrink-0" />
-                  Usa imágenes horizontales de alta calidad para el fondo.
-                </li>
-                <li className="flex items-start gap-2">
-                  <CheckCircle size={16} className="text-gold mt-1 flex-shrink-0" />
-                  Mantén el subtítulo corto y directo para mejorar la lectura.
-                </li>
-              </ul>
+            <div className="space-y-4">
+              <p className="text-sm text-gray-500 mb-4">
+                Estos enlaces aparecerán en el encabezado, pie de página y botones flotantes de toda la web.
+              </p>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                    <Instagram size={16} /> Instagram
+                  </label>
+                  <input
+                    type="text"
+                    value={localWebConfig.contact?.instagram || ''}
+                    onChange={(e) => {
+                      const currentContact = localWebConfig.contact || { email: '', phone: '', address: '', social: [] };
+                      handleFieldChange('contact', 'instagram', e.target.value);
+                    }}
+                    className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-gold outline-none"
+                    placeholder="https://instagram.com/..."
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                    <Facebook size={16} /> Facebook
+                  </label>
+                  <input
+                    type="text"
+                    value={localWebConfig.contact?.facebook || ''}
+                    onChange={(e) => {
+                      const currentContact = localWebConfig.contact || { email: '', phone: '', address: '', social: [] };
+                      handleFieldChange('contact', 'facebook', e.target.value);
+                    }}
+                    className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-gold outline-none"
+                    placeholder="https://facebook.com/..."
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                    <Linkedin size={16} /> LinkedIn
+                  </label>
+                  <input
+                    type="text"
+                    value={localWebConfig.contact?.linkedin || ''}
+                    onChange={(e) => {
+                      const currentContact = localWebConfig.contact || { email: '', phone: '', address: '', social: [] };
+                      handleFieldChange('contact', 'linkedin', e.target.value);
+                    }}
+                    className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-gold outline-none"
+                    placeholder="https://linkedin.com/in/..."
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                    <div className="w-4 h-4 flex items-center justify-center font-bold">Tk</div> TikTok
+                  </label>
+                  <input
+                    type="text"
+                    value={localWebConfig.contact?.tiktok || ''}
+                    onChange={(e) => {
+                      const currentContact = localWebConfig.contact || { email: '', phone: '', address: '', social: [] };
+                      handleFieldChange('contact', 'tiktok', e.target.value);
+                    }}
+                    className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-gold outline-none"
+                    placeholder="https://tiktok.com/@..."
+                  />
+                </div>
+              </div>
+
+              <div className="border-t border-gray-50 pt-4 mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                    <Phone size={16} /> Teléfono (Visual)
+                  </label>
+                  <input
+                    type="text"
+                    value={localWebConfig.contact?.phone || ''}
+                    onChange={(e) => {
+                      const currentContact = localWebConfig.contact || { email: '', phone: '', address: '', social: [] };
+                      handleFieldChange('contact', 'phone', e.target.value);
+                    }}
+                    className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-gold outline-none"
+                    placeholder="+54 9 351 ..."
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                    <div className="w-4 h-4 bg-green-500 rounded-full flex items-center justify-center text-white text-[10px]">W</div> WhatsApp (Número)
+                  </label>
+                  <input
+                    type="text"
+                    value={localWebConfig.contact?.whatsapp || ''}
+                    onChange={(e) => {
+                      const currentContact = localWebConfig.contact || { email: '', phone: '', address: '', social: [] };
+                      handleFieldChange('contact', 'whatsapp', e.target.value);
+                    }}
+                    className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-gold outline-none"
+                    placeholder="549351..."
+                  />
+                  <p className="text-xs text-gray-400">Solo números, sin espacios ni símbolos (+).</p>
+                </div>
+
+                <div className="space-y-2 md:col-span-2">
+                  <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                    <Mail size={16} /> Email Público
+                  </label>
+                  <input
+                    type="email"
+                    value={localWebConfig.contact?.email || ''}
+                    onChange={(e) => {
+                      const currentContact = localWebConfig.contact || { email: '', phone: '', address: '', social: [] };
+                      handleFieldChange('contact', 'email', e.target.value);
+                    }}
+                    className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-gold outline-none"
+                    placeholder="contacto@ruzzi.com.ar"
+                  />
+                </div>
+
+                <div className="space-y-2 md:col-span-2 border-t border-gray-50 pt-2">
+                  <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                    <Shield size={16} className="text-gray-400" /> Email para Recepción de Consultas (Interno)
+                  </label>
+                  <p className="text-xs text-gray-500">A este correo llegarán los mensajes del formulario de contacto.</p>
+                  <input
+                    type="email"
+                    value={localWebConfig.contact?.targetEmail || 'Ruzziventas@gmail.com'}
+                    onChange={(e) => {
+                      const currentContact = localWebConfig.contact || { email: '', phone: '', address: '', social: [] };
+                      handleFieldChange('contact', 'targetEmail', e.target.value);
+                    }}
+                    className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-gold outline-none bg-gray-50"
+                    placeholder="ejemplo@ruzzi.com.ar"
+                  />
+                </div>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Contact Config */}
-        <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 space-y-6">
-          <div className="flex items-center gap-3 border-b border-gray-50 pb-4">
-            <div className="p-2 bg-green-50 rounded-lg">
-              <Mail className="text-green-500" size={24} />
-            </div>
-            <h3 className="text-xl font-bold text-navy">Configuración de Contacto</h3>
-          </div>
-
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-gray-700">Email para recepción de consultas</label>
-              <p className="text-xs text-gray-500 mb-2">A este correo llegarán todas las consultas enviadas desde el formulario web.</p>
-              <input
-                type="email"
-                value={localWebConfig.contact?.targetEmail || 'Ruzziventas@gmail.com'}
-                onChange={(e) => {
-                  const current = localWebConfig.contact || { email: '', phone: '', address: '', social: [] };
-                  handleFieldChange('contact', 'targetEmail', e.target.value);
-                }}
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-gold outline-none"
-                placeholder="ejemplo@ruzzi.com.ar"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Social Media Embeds Config */}
+        {/* Social Feed Config */}
         <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 space-y-6">
           <div className="flex items-center gap-3 border-b border-gray-50 pb-4">
             <div className="p-2 bg-pink-50 rounded-lg">
               <Layout className="text-pink-500" size={24} />
             </div>
-            <h3 className="text-xl font-bold text-navy">Redes Sociales Embebidas</h3>
+            <h3 className="text-xl font-bold text-navy">Feed de Redes (Embebido)</h3>
           </div>
 
           <div className="space-y-4">
-            <div className="flex gap-4">
-              <button
-                className={`px-4 py-2 rounded-lg border ${true ? 'bg-navy text-white border-navy' : 'bg-gray-50 text-gray-500'}`}
-              >
-                Página "Nosotros"
-              </button>
-              {/* Future: Add more pages here */}
-            </div>
-
             <div className="space-y-2">
               <label className="text-sm font-semibold text-gray-700 flex justify-between">
                 URL del Post (Instagram, TikTok, etc.)
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-500">Habilitar sección</span>
+                  <span className="text-xs text-gray-500">Habilitar en "Nosotros"</span>
                   <input
                     type="checkbox"
                     checked={localWebConfig.socialEmbeds?.['about']?.enabled ?? false}
@@ -856,6 +1077,277 @@ const AdminDashboard = () => {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+
+
+        {/* About Page Config */}
+        <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 space-y-6">
+          <div className="flex items-center gap-3 border-b border-gray-50 pb-4">
+            <div className="p-2 bg-indigo-50 rounded-lg">
+              <Shield className="text-indigo-500" size={24} />
+            </div>
+            <h3 className="text-xl font-bold text-navy">Página "Nosotros"</h3>
+          </div>
+
+          <div className="space-y-8">
+            {/* Hero Section */}
+            <div className="space-y-4 border-b border-gray-50 pb-6">
+              <h4 className="font-semibold text-gray-900 flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-gold"></span>
+                Sección Principal (Hero)
+              </h4>
+              <div className="grid grid-cols-1 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">Título</label>
+                  <input
+                    type="text"
+                    value={localWebConfig.about?.hero?.title || 'GRUPO RUZZI'}
+                    onChange={(e) => {
+                      const currentAbout = localWebConfig.about || {};
+                      const currentHero = currentAbout.hero || { title: '', description1: '', description2: '' };
+                      handleFieldChange('about', 'hero', { ...currentHero, title: e.target.value });
+                    }}
+                    className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-gold outline-none"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">Descripción Párrafo 1</label>
+                  <textarea
+                    value={localWebConfig.about?.hero?.description1 || ''}
+                    onChange={(e) => {
+                      const currentAbout = localWebConfig.about || {};
+                      const currentHero = currentAbout.hero || { title: '', description1: '', description2: '' };
+                      handleFieldChange('about', 'hero', { ...currentHero, description1: e.target.value });
+                    }}
+                    className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-gold outline-none h-24"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">Descripción Párrafo 2</label>
+                  <textarea
+                    value={localWebConfig.about?.hero?.description2 || ''}
+                    onChange={(e) => {
+                      const currentAbout = localWebConfig.about || {};
+                      const currentHero = currentAbout.hero || { title: '', description1: '', description2: '' };
+                      handleFieldChange('about', 'hero', { ...currentHero, description2: e.target.value });
+                    }}
+                    className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-gold outline-none h-24"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* What We Do */}
+            <div className="space-y-4 border-b border-gray-50 pb-6">
+              <h4 className="font-semibold text-gray-900 flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-gold"></span>
+                Sección "Qué Hacemos"
+              </h4>
+              <div className="grid grid-cols-1 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">Título</label>
+                  <input
+                    type="text"
+                    value={localWebConfig.about?.whatWeDo?.title || 'QUÉ HACEMOS'}
+                    onChange={(e) => {
+                      const currentAbout = localWebConfig.about || {};
+                      const currentSection = currentAbout.whatWeDo || { title: '', description1: '', description2: '', image: '', quote: '' };
+                      handleFieldChange('about', 'whatWeDo', { ...currentSection, title: e.target.value });
+                    }}
+                    className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-gold outline-none"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">Imagen (URL)</label>
+                  <input
+                    type="text"
+                    value={localWebConfig.about?.whatWeDo?.image || ''}
+                    onChange={(e) => {
+                      const currentAbout = localWebConfig.about || {};
+                      const currentSection = currentAbout.whatWeDo || { title: '', description1: '', description2: '', image: '', quote: '' };
+                      handleFieldChange('about', 'whatWeDo', { ...currentSection, image: e.target.value });
+                    }}
+                    className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-gold outline-none"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">Descripción Párrafo 1</label>
+                  <textarea
+                    value={localWebConfig.about?.whatWeDo?.description1 || ''}
+                    onChange={(e) => {
+                      const currentAbout = localWebConfig.about || {};
+                      const currentSection = currentAbout.whatWeDo || { title: '', description1: '', description2: '', image: '', quote: '' };
+                      handleFieldChange('about', 'whatWeDo', { ...currentSection, description1: e.target.value });
+                    }}
+                    className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-gold outline-none h-20"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">Descripción Párrafo 2</label>
+                  <textarea
+                    value={localWebConfig.about?.whatWeDo?.description2 || ''}
+                    onChange={(e) => {
+                      const currentAbout = localWebConfig.about || {};
+                      const currentSection = currentAbout.whatWeDo || { title: '', description1: '', description2: '', image: '', quote: '' };
+                      handleFieldChange('about', 'whatWeDo', { ...currentSection, description2: e.target.value });
+                    }}
+                    className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-gold outline-none h-20"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">Frase Destacada (Quote)</label>
+                  <input
+                    type="text"
+                    value={localWebConfig.about?.whatWeDo?.quote || ''}
+                    onChange={(e) => {
+                      const currentAbout = localWebConfig.about || {};
+                      const currentSection = currentAbout.whatWeDo || { title: '', description1: '', description2: '', image: '', quote: '' };
+                      handleFieldChange('about', 'whatWeDo', { ...currentSection, quote: e.target.value });
+                    }}
+                    className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-gold outline-none italic bg-gray-50"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Commitment */}
+            <div className="space-y-4 border-b border-gray-50 pb-6">
+              <h4 className="font-semibold text-gray-900 flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-gold"></span>
+                Sección "Nuestro Compromiso"
+              </h4>
+              <div className="grid grid-cols-1 gap-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">Subtítulo (Dorado)</label>
+                    <input
+                      type="text"
+                      value={localWebConfig.about?.commitment?.subtitle || 'Nuestra Promesa'}
+                      onChange={(e) => {
+                        const currentAbout = localWebConfig.about || {};
+                        const currentSection = currentAbout.commitment || { title: '', subtitle: '', description: '', quote: '' };
+                        handleFieldChange('about', 'commitment', { ...currentSection, subtitle: e.target.value });
+                      }}
+                      className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-gold outline-none"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">Título Grande</label>
+                    <input
+                      type="text"
+                      value={localWebConfig.about?.commitment?.title || 'NUESTRO COMPROMISO'}
+                      onChange={(e) => {
+                        const currentAbout = localWebConfig.about || {};
+                        const currentSection = currentAbout.commitment || { title: '', subtitle: '', description: '', quote: '' };
+                        handleFieldChange('about', 'commitment', { ...currentSection, title: e.target.value });
+                      }}
+                      className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-gold outline-none"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">Descripción</label>
+                  <textarea
+                    value={localWebConfig.about?.commitment?.description || ''}
+                    onChange={(e) => {
+                      const currentAbout = localWebConfig.about || {};
+                      const currentSection = currentAbout.commitment || { title: '', subtitle: '', description: '', quote: '' };
+                      handleFieldChange('about', 'commitment', { ...currentSection, description: e.target.value });
+                    }}
+                    className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-gold outline-none h-24"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">Frase Final (Quote)</label>
+                  <input
+                    type="text"
+                    value={localWebConfig.about?.commitment?.quote || ''}
+                    onChange={(e) => {
+                      const currentAbout = localWebConfig.about || {};
+                      const currentSection = currentAbout.commitment || { title: '', subtitle: '', description: '', quote: '' };
+                      handleFieldChange('about', 'commitment', { ...currentSection, quote: e.target.value });
+                    }}
+                    className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-gold outline-none italic bg-gray-50"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Values */}
+            <div className="space-y-4">
+              <h4 className="font-semibold text-gray-900 flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-gold"></span>
+                Sección "Valores"
+              </h4>
+              <div className="grid grid-cols-1 gap-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">Título</label>
+                    <input
+                      type="text"
+                      value={localWebConfig.about?.values?.title || 'Nuestros Valores'}
+                      onChange={(e) => {
+                        const currentAbout = localWebConfig.about || {};
+                        const currentValues = currentAbout.values || { title: '', subtitle: '', items: [] };
+                        handleFieldChange('about', 'values', { ...currentValues, title: e.target.value });
+                      }}
+                      className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-gold outline-none"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">Subtítulo</label>
+                    <input
+                      type="text"
+                      value={localWebConfig.about?.values?.subtitle || ''}
+                      onChange={(e) => {
+                        const currentAbout = localWebConfig.about || {};
+                        const currentValues = currentAbout.values || { title: '', subtitle: '', items: [] };
+                        handleFieldChange('about', 'values', { ...currentValues, subtitle: e.target.value });
+                      }}
+                      className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-gold outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Value Items Editor */}
+                <div className="space-y-3 mt-2">
+                  <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Items de Valores (3)</p>
+                  {[0, 1, 2].map((idx) => (
+                    <div key={idx} className="p-4 bg-gray-50 rounded-lg border border-gray-100 grid grid-cols-1 gap-3">
+                      <input
+                        type="text"
+                        placeholder="Título del Valor"
+                        value={localWebConfig.about?.values?.items?.[idx]?.title || ''}
+                        onChange={(e) => {
+                          const currentAbout = localWebConfig.about || {};
+                          const currentValues = currentAbout.values || { title: '', subtitle: '', items: [] };
+                          const newItems = [...(currentValues.items || [])];
+                          if (!newItems[idx]) newItems[idx] = { title: '', description: '' };
+                          newItems[idx] = { ...newItems[idx], title: e.target.value };
+                          handleFieldChange('about', 'values', { ...currentValues, items: newItems });
+                        }}
+                        className="w-full px-3 py-1.5 text-sm font-bold rounded border border-gray-200 focus:ring-1 focus:ring-gold outline-none"
+                      />
+                      <textarea
+                        placeholder="Descripción del Valor"
+                        value={localWebConfig.about?.values?.items?.[idx]?.description || ''}
+                        onChange={(e) => {
+                          const currentAbout = localWebConfig.about || {};
+                          const currentValues = currentAbout.values || { title: '', subtitle: '', items: [] };
+                          const newItems = [...(currentValues.items || [])];
+                          if (!newItems[idx]) newItems[idx] = { title: '', description: '' };
+                          newItems[idx] = { ...newItems[idx], description: e.target.value };
+                          handleFieldChange('about', 'values', { ...currentValues, items: newItems });
+                        }}
+                        className="w-full px-3 py-1.5 text-sm rounded border border-gray-200 focus:ring-1 focus:ring-gold outline-none h-16 resize-none"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
           </div>
         </div>
       </div>
@@ -919,10 +1411,10 @@ const AdminDashboard = () => {
                           if (confirm('¿Estás seguro de que deseas eliminar este usuario? Esta acción no se puede deshacer.')) {
                             try {
                               await deleteUser(u.id);
-                              alert('Usuario eliminado correctamente');
+                              toast.success('Usuario eliminado correctamente');
                             } catch (err: any) {
                               console.error('Error eliminating user:', err);
-                              alert(`Error al eliminar usuario: ${err.message}`);
+                              toast.error(`Error al eliminar usuario: ${err.message}`);
                             }
                           }
                         }}
@@ -1055,7 +1547,7 @@ const AdminDashboard = () => {
                   <div className="mb-6">
                     <div className="flex justify-between items-center mb-2">
                       <h3 className="text-sm font-medium">Galería de Imágenes</h3>
-                      {modalMode === 'edit' && (
+                      {modalMode !== 'view' && (
                         <label className="cursor-pointer flex items-center gap-1 text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded hover:bg-blue-100">
                           <Upload size={14} />
                           Agregar
@@ -1071,66 +1563,77 @@ const AdminDashboard = () => {
                       )}
                     </div>
 
-                    {(selectedProperty?.full_images?.length || 0) > 0 ? (
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                        {selectedProperty?.full_images?.map((img, idx) => (
-                          <div key={img.id} className="relative aspect-video rounded-md overflow-hidden bg-gray-100 group">
-                            <img
-                              src={img.image_url}
-                              alt={`${selectedProperty.title} ${idx + 1}`}
-                              className="w-full h-full object-cover"
-                            />
-                            {modalMode === 'edit' && !imagesLoading && (
-                              <div className="absolute inset-0 bg-black bg-opacity-40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                                {idx > 0 && (
+                    {(() => {
+                      const displayImages = modalMode === 'create'
+                        ? pendingImages.map((file, i) => ({
+                          id: `pending-${i}`,
+                          image_url: URL.createObjectURL(file),
+                          is_primary: i === 0,
+                          display_order: i
+                        }))
+                        : (selectedProperty?.full_images || []);
+
+                      return displayImages.length > 0 ? (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                          {displayImages.map((img, idx) => (
+                            <div key={img.id} className="relative aspect-video rounded-md overflow-hidden bg-gray-100 group">
+                              <img
+                                src={img.image_url}
+                                alt={`Property image ${idx + 1}`}
+                                className="w-full h-full object-cover"
+                              />
+                              {modalMode !== 'view' && !imagesLoading && (
+                                <div className="absolute inset-0 bg-black bg-opacity-40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                                  {modalMode === 'edit' && idx > 0 && (
+                                    <button
+                                      onClick={(e) => { e.preventDefault(); handleMoveImage(idx, 'left'); }}
+                                      className="p-1 bg-white rounded-full text-gray-700 hover:text-blue-600"
+                                      title="Mover a la izquierda"
+                                    >
+                                      <ArrowLeft size={14} />
+                                    </button>
+                                  )}
+                                  {modalMode === 'edit' && idx < (displayImages.length || 0) - 1 && (
+                                    <button
+                                      onClick={(e) => { e.preventDefault(); handleMoveImage(idx, 'right'); }}
+                                      className="p-1 bg-white rounded-full text-gray-700 hover:text-blue-600"
+                                      title="Mover a la derecha"
+                                    >
+                                      <ArrowRight size={14} />
+                                    </button>
+                                  )}
                                   <button
-                                    onClick={(e) => { e.preventDefault(); handleMoveImage(idx, 'left'); }}
-                                    className="p-1 bg-white rounded-full text-gray-700 hover:text-blue-600"
-                                    title="Mover a la izquierda"
+                                    onClick={(e) => { e.preventDefault(); handleDeleteImage(img.id); }}
+                                    className="p-1 bg-white rounded-full text-red-600 hover:bg-red-50"
+                                    title="Eliminar imagen"
                                   >
-                                    <ArrowLeft size={14} />
+                                    <X size={14} />
                                   </button>
-                                )}
-                                {idx < (selectedProperty.full_images?.length || 0) - 1 && (
-                                  <button
-                                    onClick={(e) => { e.preventDefault(); handleMoveImage(idx, 'right'); }}
-                                    className="p-1 bg-white rounded-full text-gray-700 hover:text-blue-600"
-                                    title="Mover a la derecha"
-                                  >
-                                    <ArrowRight size={14} />
-                                  </button>
-                                )}
-                                <button
-                                  onClick={(e) => { e.preventDefault(); handleDeleteImage(img.id); }}
-                                  className="p-1 bg-white rounded-full text-red-600 hover:bg-red-50"
-                                  title="Eliminar imagen"
-                                >
-                                  <X size={14} />
-                                </button>
-                                {!img.is_primary && (
-                                  <button
-                                    onClick={(e) => { e.preventDefault(); handleSetPrimaryImage(img.id); }}
-                                    className="p-1 bg-white rounded-full text-yellow-500 hover:bg-yellow-50"
-                                    title="Establecer como principal"
-                                  >
-                                    <Star size={14} />
-                                  </button>
-                                )}
-                              </div>
-                            )}
-                            {img.is_primary && (
-                              <div className="absolute top-1 left-1 bg-blue-600 text-white text-[10px] px-1 rounded">
-                                Principal
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-center py-4 bg-gray-50 rounded-md text-xs text-gray-400">
-                        No hay imágenes cargadas
-                      </div>
-                    )}
+                                  {modalMode === 'edit' && !img.is_primary && (
+                                    <button
+                                      onClick={(e) => { e.preventDefault(); handleSetPrimaryImage(img.id); }}
+                                      className="p-1 bg-white rounded-full text-yellow-500 hover:bg-yellow-50"
+                                      title="Establecer como principal"
+                                    >
+                                      <Star size={14} />
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+                              {img.is_primary && (
+                                <div className="absolute top-1 left-1 bg-blue-600 text-white text-[10px] px-1 rounded">
+                                  Principal
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-4 bg-gray-50 rounded-md text-xs text-gray-400">
+                          No hay imágenes cargadas
+                        </div>
+                      );
+                    })()}
                     {imagesLoading && (
                       <div className="mt-2 text-center text-xs text-blue-600 animate-pulse">
                         Procesando imágenes...
