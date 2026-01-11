@@ -108,10 +108,10 @@ const HomePage = () => {
               CONTACTAR ASESOR
             </Button>
             <Button
-              variant="outline"
+              variant="custom"
               size="lg"
-              onClick={() => window.open('https://wa.me/5493510000000', '_blank')} // Replace with actual number if known, or keeps generic
-              className="px-10 py-5 text-lg border-white/30 text-white hover:bg-white/10 hover:border-white"
+              onClick={() => window.open('https://wa.me/5493518178057', '_blank')}
+              className="px-10 py-5 text-lg border-transparent bg-[#25D366] text-white hover:bg-[#20bd5a] hover:shadow-[0_0_20px_rgba(37,211,102,0.4)] transition-all transform hover:scale-105"
             >
               WHATSAPP
             </Button>

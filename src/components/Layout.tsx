@@ -3,12 +3,23 @@ import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Menu, X, Instagram, Facebook, Linkedin, Phone, Mail, MapPin, Home, Search, Heart, MessageSquare, Lock } from 'lucide-react';
 import { NAV_LINKS } from '../constants';
+import { useApp } from '../context/AppContext';
 import Logo from './Logo';
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const location = useLocation();
+  const { webConfig } = useApp();
+
+  // Default values
+  const phone = webConfig?.contact?.phone || '+54 9 351 817-8057';
+  const whatsapp = webConfig?.contact?.whatsapp || '5493518178057';
+  const email = webConfig?.contact?.email || 'Ruzziventas@gmail.com';
+  const instagram = webConfig?.contact?.instagram || 'https://www.instagram.com/grupo.ruzzi';
+  const facebook = webConfig?.contact?.facebook || 'https://www.facebook.com/RuzziInmobiliariaDesarrollista';
+  const linkedin = webConfig?.contact?.linkedin;
+  const tiktok = webConfig?.contact?.tiktok;
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,10 +36,11 @@ const Header = () => {
         <div className="container mx-auto px-6">
           <div className="flex items-center justify-between h-12 text-sm">
             <div className="flex items-center space-x-6">
-              <a href="tel:+5493518178057" className="flex items-center gap-2 hover:text-gold transition-colors" title="Llamar">
+              <a href={`tel:${phone}`} className="flex items-center gap-2 hover:text-gold transition-colors" title="Llamar">
                 <Phone size={16} />
+                <span className="hidden xl:inline">{phone}</span>
               </a>
-              <a href="mailto:Ruzziventas@gmail.com" className="flex items-center gap-2 hover:text-gold transition-colors" title="Enviar Correo">
+              <a href={`mailto:${email}`} className="flex items-center gap-2 hover:text-gold transition-colors" title="Enviar Correo">
                 <Mail size={16} />
               </a>
             </div>
@@ -39,12 +51,26 @@ const Header = () => {
               </Link>
               <span>|</span>
               <div className="flex gap-3">
-                <a href="#" className="hover:text-gold transition-colors">
-                  <Instagram size={16} />
-                </a>
-                <a href="#" className="hover:text-gold transition-colors">
-                  <Facebook size={16} />
-                </a>
+                {instagram && (
+                  <a href={instagram} target="_blank" rel="noopener noreferrer" className="hover:text-gold transition-colors">
+                    <Instagram size={16} />
+                  </a>
+                )}
+                {facebook && (
+                  <a href={facebook} target="_blank" rel="noopener noreferrer" className="hover:text-gold transition-colors">
+                    <Facebook size={16} />
+                  </a>
+                )}
+                {linkedin && (
+                  <a href={linkedin} target="_blank" rel="noopener noreferrer" className="hover:text-gold transition-colors">
+                    <Linkedin size={16} />
+                  </a>
+                )}
+                {tiktok && (
+                  <a href={tiktok} target="_blank" rel="noopener noreferrer" className="hover:text-gold transition-colors font-bold text-xs flex items-center">
+                    Tk
+                  </a>
+                )}
               </div>
             </div>
           </div>
@@ -176,6 +202,16 @@ const Header = () => {
 };
 
 const Footer = () => {
+  const { webConfig } = useApp();
+  // Default values
+  const phone = webConfig?.contact?.phone || '+54 9 351 817-8057';
+  const email = webConfig?.contact?.email || 'Ruzziventas@gmail.com';
+  const instagram = webConfig?.contact?.instagram || 'https://www.instagram.com/grupo.ruzzi';
+  const facebook = webConfig?.contact?.facebook || 'https://www.facebook.com/RuzziInmobiliariaDesarrollista';
+  const linkedin = webConfig?.contact?.linkedin;
+  const tiktok = webConfig?.contact?.tiktok;
+  const address = webConfig?.contact?.address || 'Docta manzana 81 lote 05 etapa 4, Córdoba, Argentina';
+
   return (
     <footer className="bg-navy text-white pt-20 pb-10 border-t-2 border-gold">
       <div className="container mx-auto px-6">
@@ -210,18 +246,18 @@ const Footer = () => {
                 <div className="p-2 bg-white/5 rounded-full group-hover:bg-gold group-hover:text-navy transition-all">
                   <MapPin size={16} />
                 </div>
-                <span className="leading-relaxed">Docta manzana 81 lote 05 etapa 4,<br />Córdoba, Argentina</span>
+                <span className="leading-relaxed">{address}</span>
               </li>
               <li className="flex items-center gap-4 group">
-                <a href="tel:+5493518178057" className="p-2 bg-white/5 rounded-full group-hover:bg-gold group-hover:text-navy transition-all flex items-center gap-3">
+                <a href={`tel:${phone}`} className="p-2 bg-white/5 rounded-full group-hover:bg-gold group-hover:text-navy transition-all flex items-center gap-3">
                   <Phone size={16} />
-                  <span className="group-hover:text-navy transition-colors">Llamar ahora</span>
+                  <span className="group-hover:text-navy transition-colors">{phone}</span>
                 </a>
               </li>
               <li className="flex items-center gap-4 group">
-                <a href="mailto:Ruzziventas@gmail.com" className="p-2 bg-white/5 rounded-full group-hover:bg-gold group-hover:text-navy transition-all flex items-center gap-3">
+                <a href={`mailto:${email}`} className="p-2 bg-white/5 rounded-full group-hover:bg-gold group-hover:text-navy transition-all flex items-center gap-3">
                   <Mail size={16} />
-                  <span className="group-hover:text-navy transition-colors">Enviar correo</span>
+                  <span className="group-hover:text-navy transition-colors">{email}</span>
                 </a>
               </li>
             </ul>
@@ -230,19 +266,32 @@ const Footer = () => {
           <div>
             <h4 className="text-xl font-serif font-semibold mb-8 text-gold">Síguenos</h4>
             <div className="flex gap-4">
-              <a href="#" className="w-10 h-10 rounded-full border border-gray-600 flex items-center justify-center hover:bg-gold hover:border-gold hover:text-white transition-all duration-300">
-                <Instagram size={18} />
-              </a>
-              <a href="#" className="w-10 h-10 rounded-full border border-gray-600 flex items-center justify-center hover:bg-gold hover:border-gold hover:text-white transition-all duration-300">
-                <Facebook size={18} />
-              </a>
-
+              {instagram && (
+                <a href={instagram} target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-full border border-gray-600 flex items-center justify-center hover:bg-gold hover:border-gold hover:text-white transition-all duration-300">
+                  <Instagram size={18} />
+                </a>
+              )}
+              {facebook && (
+                <a href={facebook} target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-full border border-gray-600 flex items-center justify-center hover:bg-gold hover:border-gold hover:text-white transition-all duration-300">
+                  <Facebook size={18} />
+                </a>
+              )}
+              {linkedin && (
+                <a href={linkedin} target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-full border border-gray-600 flex items-center justify-center hover:bg-gold hover:border-gold hover:text-white transition-all duration-300">
+                  <Linkedin size={18} />
+                </a>
+              )}
+              {tiktok && (
+                <a href={tiktok} target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-full border border-gray-600 flex items-center justify-center hover:bg-gold hover:border-gold hover:text-white transition-all duration-300 font-bold text-xs">
+                  Tk
+                </a>
+              )}
             </div>
           </div>
         </div>
 
         <div className="border-t border-gray-800 pt-8 flex flex-col md:flex-row justify-between items-center text-xs text-gray-500 font-medium uppercase tracking-wider">
-          <p>© 2025 RUZZI Desarrollos. Todos los derechos reservados.</p>
+          <p>© 2026 RUZZI Desarrollos. Todos los derechos reservados.</p>
           <div className="flex gap-8 mt-4 md:mt-0">
             <Link to="/login" className="hover:text-gold transition-colors flex items-center gap-1">
               <Lock size={10} /> Acceso Staff

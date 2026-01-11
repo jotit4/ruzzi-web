@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import Button from '../components/Button';
+import { toast } from 'sonner';
 import { MapPin, Phone, Mail, Clock, Lock } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { supabase } from '../lib/supabase';
@@ -52,10 +53,10 @@ const ContactPage = () => {
         // Optional: Notify user or just fail silently regarding email, but lead is created.
       }
 
-      alert('Gracias ' + formData.name + '. Tu consulta ha sido enviada y registrada.');
+      toast.success('Gracias ' + formData.name + '. Tu consulta ha sido enviada y registrada.');
       setFormData({ name: '', email: '', phone: '', type: 'Consulta General', message: '' });
     } catch (error) {
-      alert('Error al enviar el formulario. Por favor intente nuevamente.');
+      toast.error('Error al enviar el formulario. Por favor intente nuevamente.');
     } finally {
       setIsSubmitting(false);
     }

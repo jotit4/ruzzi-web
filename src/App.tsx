@@ -4,6 +4,9 @@ import React from 'react';
 import { HashRouter as Router, Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import { AppProvider, useApp } from './context/AppContext';
 import Layout from './components/Layout';
+import { Toaster } from './components/ui/sonner';
+import WhatsAppButton from './components/WhatsAppButton';
+
 import HomePage from './pages/HomePage';
 import PropertiesPage from './pages/PropertiesPage';
 import PropertyDetail from './pages/PropertyDetail';
@@ -80,7 +83,9 @@ const App = () => {
     <AppProvider>
       <Router>
         <AppRoutes />
+        <WhatsAppButton />
       </Router>
+      <Toaster />
     </AppProvider>
   );
 };

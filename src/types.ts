@@ -74,7 +74,12 @@ export interface WebConfig {
     targetEmail?: string;
     email: string;
     phone: string;
+    whatsapp?: string;
     address: string;
+    instagram?: string;
+    facebook?: string;
+    linkedin?: string;
+    tiktok?: string;
     social: { platform: string; url: string }[];
   };
   socialEmbeds?: {
@@ -87,6 +92,34 @@ export interface WebConfig {
   puck_data?: {
     content: any[];
     root: any;
+  };
+  about?: {
+    hero: {
+      title: string;
+      description1: string;
+      description2: string;
+    };
+    whatWeDo: {
+      title: string;
+      description1: string;
+      description2: string;
+      image: string;
+      quote: string;
+    };
+    commitment: {
+      subtitle: string;
+      title: string;
+      description: string;
+      quote: string;
+    };
+    values: {
+      title: string;
+      subtitle: string;
+      items: {
+        title: string;
+        description: string;
+      }[];
+    };
   };
 }
 

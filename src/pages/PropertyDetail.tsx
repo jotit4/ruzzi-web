@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import Button from '../components/Button';
 import { Bed, Bath, Maximize, MapPin, Share2, Calendar, Check, ChevronLeft, ChevronRight, Play, Star } from 'lucide-react';
+import ScrollContactForm from '../components/ScrollContactForm';
 
 const PropertyDetail = () => {
   const { id } = useParams();
@@ -222,13 +223,33 @@ const PropertyDetail = () => {
 
             <div className="flex flex-col gap-4 px-4 max-w-7xl mx-auto">
               {images.map((img, idx) => (
-                <div key={idx} className="w-full relative group">
-                  <img
-                    src={img}
-                    alt={`Vista ${idx + 1}`}
-                    className="w-full h-auto object-cover rounded-sm shadow-2xl transition-transform duration-700 hover:scale-[1.01]"
-                    loading="lazy"
-                  />
+                <div key={idx} className="space-y-4">
+                  <div className="w-full relative group">
+                    <img
+                      src={img}
+                      alt={`Vista ${idx + 1}`}
+                      className="w-full h-auto object-cover rounded-sm shadow-2xl transition-transform duration-700 hover:scale-[1.01]"
+                      loading="lazy"
+                    />
+                  </div>
+
+                  {/* Interstitial Quote every 2 images */}
+                  {(idx + 1) % 2 === 0 && (idx + 1) < images.length && (
+                    <div className="py-24 flex items-center justify-center bg-navy/5 rounded-sm my-8 border-y border-gold/20">
+                      <div className="text-center max-w-2xl px-6">
+                        <span className="text-gold text-4xl font-serif">"</span>
+                        <h3 className="text-2xl md:text-3xl font-serif text-navy italic font-medium leading-relaxed my-4">
+                          {[
+                            "No compras una propiedad, inviertes en tu legado.",
+                            "El escenario perfecto para los momentos que importan.",
+                            "Exclusividad y diseño en cada rincón.",
+                            "Donde la arquitectura abraza tus sueños."
+                          ][(idx % 4)]}
+                        </h3>
+                        <div className="h-0.5 w-12 bg-gold mx-auto"></div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
 
@@ -241,7 +262,9 @@ const PropertyDetail = () => {
           </div>
         )}
       </section>
-    </div>
+
+      <ScrollContactForm propertyId={property.id} propertyTitle={property.title} />
+    </div >
   );
 };
 

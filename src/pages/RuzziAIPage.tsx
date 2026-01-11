@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { toast } from 'sonner';
 import { Send, Bot, User, ArrowRight, Sparkles, Building2, TrendingUp, ShieldCheck } from 'lucide-react';
 import Button from '../components/Button';
 import { useApp } from '../context/AppContext';
@@ -105,7 +106,7 @@ const RuzziAIPage = () => {
         created_by: null,
         updated_by: null
       });
-      alert('¡Excelente! Tu consulta ha sido registrada. Un asesor humano te contactará pronto.');
+      toast.success('¡Excelente! Tu consulta ha sido registrada. Un asesor humano te contactará pronto.');
     }
   };
 
