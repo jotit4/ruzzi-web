@@ -15,6 +15,12 @@ RUN pnpm install --frozen-lockfile
 # Copy source code
 COPY . .
 
+# Declare build-time env vars so Vite can embed them in the bundle
+ARG VITE_SUPABASE_URL
+ARG VITE_SUPABASE_ANON_KEY
+ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL
+ENV VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY
+
 # Build the application
 # We use direct commands to avoid the redundant 'pnpm install' in the build:prod script
 RUN rm -rf node_modules/.vite-temp && pnpm tsc -b && BUILD_MODE=prod pnpm vite build
