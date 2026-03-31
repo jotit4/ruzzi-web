@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { supabase } from '../lib/supabase';
 
 export interface UploadResult {
   url: string;
@@ -89,21 +88,20 @@ export function useImageUpload() {
     return results;
   };
 
-  const deleteImage = async (imageUrl: string): Promise<boolean> => {
+  const deleteImage = async (imageUrl: string, imageId: string): Promise<boolean> => {
     try {
-      // Extract file path from URL
-      const url = new URL(imageUrl);
-      const pathParts = url.pathname.split('/');
-      const fileName = pathParts[pathParts.length - 1];
-      const bucketPath = pathParts.slice(pathParts.length - 2, -1).join('/');
-      const fullPath = `${bucketPath}/${fileName}`;
-
-      const { error } = await supabase.storage
-        .from('property-images')
-        .remove([fullPath]);
-
-      if (error) throw error;
-      return true;
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/property-image-delete`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ imageUrl, imageId }),
+        }
+      );
+      return response.ok;
     } catch (err) {
       console.error('Delete error:', err);
       return false;
