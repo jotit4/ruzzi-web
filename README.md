@@ -1,50 +1,67 @@
-# React + TypeScript + Vite
+# Ruzzi Web — real estate platform with a self-service content layer
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A production web platform for a real estate agency: property catalogue, guided search, lead capture,
+and a back office where the agency runs its own listings, leads and landing pages **without a
+developer in the loop**.
 
-Currently, two official plugins are available:
+Built end to end — discovery with the client, data model, implementation, deployment and the
+post-launch technical audit.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+---
 
-## Expanding the ESLint configuration
+## The problem it solves
 
-If you are developing a production application, we recommend updating the configuration to enable type aware lint rules:
+The agency's previous site was a brochure. Every price change, every new listing and every landing
+page for a campaign meant a ticket to a developer and a wait. Meanwhile leads arrived through four
+different channels and lived nowhere in particular.
 
-- Configure the top-level `parserOptions` property like this:
+Two decisions followed from that, and they shaped the whole build:
 
-```js
-export default tseslint.config({
-  languageOptions: {
-    // other options...
-    parserOptions: {
-      project: ['./tsconfig.node.json', './tsconfig.app.json'],
-      tsconfigRootDir: import.meta.dirname,
-    },
-  },
-})
-```
+1. **The agency edits the site, not the developer.** Pages are composed visually in the admin panel
+   and rendered by the app, so marketing can ship a campaign landing page on its own.
+2. **Every lead lands in one place, attributed.** Whatever the entry point — floating form, property
+   enquiry, WhatsApp — the lead is normalised into a single pipeline and assigned to an agent.
 
-- Replace `tseslint.configs.recommended` to `tseslint.configs.recommendedTypeChecked` or `tseslint.configs.strictTypeChecked`
-- Optionally add `...tseslint.configs.stylisticTypeChecked`
-- Install [eslint-plugin-react](https://github.com/jsx-eslint/eslint-plugin-react) and update the config:
+## What it does
 
-```js
-// eslint.config.js
-import react from 'eslint-plugin-react'
+**Public site**
+- Property catalogue with filtering by type, price, location and features.
+- Property detail pages with galleries, specifications and enquiry forms.
+- Side-by-side property comparison.
+- **Ruzzi AI** — a guided assistant that narrows listings conversationally by budget and intent
+  instead of making the visitor operate filters.
+- Lead capture on scroll, plus a direct WhatsApp channel.
 
-export default tseslint.config({
-  // Set the react version
-  settings: { react: { version: '18.3' } },
-  plugins: {
-    // Add the react plugin
-    react,
-  },
-  rules: {
-    // other rules...
-    // Enable its recommended rules
-    ...react.configs.recommended.rules,
-    ...react.configs['jsx-runtime'].rules,
-  },
-})
-```
+**Back office (role-gated)**
+- Property CRUD with image upload and publish/draft states.
+- Lead inbox with automatic assignment to agents.
+- Dashboard with operational metrics.
+- **Visual page editor** — pages are built by composing blocks and stored as structured content,
+  then rendered by the app at request time.
+- User management with role-based access control.
+
+## Architecture notes
+
+- **Content as data, not as code.** The visual editor stores a page as a structured document; a
+  renderer maps it to React components. New page types are a component registration, not a
+  deployment. This is what keeps the agency independent.
+- **Business logic in edge functions.** Property search, lead creation and assignment, bookings,
+  image upload and transactional email run as ten Supabase Edge Functions rather than in the client,
+  so the browser never becomes the authority on who owns a lead.
+- **Typed boundaries.** Forms are validated with Zod schemas shared between form state and the
+  functions that persist them, so a malformed lead fails at the edge instead of halfway through.
+- **Role-based routing.** Admin surfaces sit behind a guard that resolves the session role before
+  rendering, not after.
+
+## Stack
+
+**Frontend** React 19 · TypeScript · Vite · Tailwind CSS · Radix UI · React Router
+**Content** Puck (visual page composition) · structured page documents
+**Backend** Supabase — PostgreSQL, Auth, Storage, Edge Functions (Deno)
+**Forms & data** React Hook Form · Zod · Recharts
+**Deployment** Docker · nginx
+
+---
+
+*Client-facing project. This repository holds the application code; the agency's data and
+credentials are not part of it.*
